@@ -62,7 +62,6 @@ public class Configurator {
                 ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
                 byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, fabricUser);
                 Channel channel = hfClient.newChannel(channelName, orderer, channelConfiguration, channelConfigurationSignature);
-                channel.addOrderer(orderer);
                 for (Peer peer : peerList) {
                     channel.joinPeer(peer);
                 }

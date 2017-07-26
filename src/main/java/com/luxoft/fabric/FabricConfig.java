@@ -35,6 +35,10 @@ public class FabricConfig extends YamlConfig {
         return getRoot().get("channels").elements();
     }
 
+    public JsonNode getChannelDetails(String key) {
+        return getRoot().withArray("channels").findValue("mychannel");
+    }
+
     public JsonNode getPeerDetails(String key) {
         return getRoot().get("peers").findValue(key);
     }
@@ -110,6 +114,36 @@ public class FabricConfig extends YamlConfig {
         }
 
         return hfClient.newPeer(peerName, peerUrl, peerProperties);
+    }
+
+    public Channel getChannel(HFClient hfClient, String key) throws Exception {
+        String channelName = key;
+        JsonNode channelParameters = requireNonNull(getChannelDetails(key));
+        String adminKey = channelParameters.get("admin").asText();
+        final User fabricUser = getAdmin(adminKey);
+
+        hfClient.setUserContext(fabricUser);
+
+        String ordererName = channelParameters.get("orderer").asText();
+        Orderer orderer = getNewOrderer(hfClient, ordererName);
+
+        Iterator<JsonNode> peers = channelParameters.get("peers").iterator();
+        if (!peers.hasNext())
+            throw new RuntimeException("Peers list can`t be empty");
+        List<Peer> peerList = new ArrayList<>();
+        while (peers.hasNext()) {
+            String peerKey = peers.next().asText();
+            Peer peer = getNewPeer(hfClient, peerKey);
+            peerList.add(peer);
+        }
+
+        Channel channel = hfClient.newChannel(channelName);
+        channel.addOrderer(orderer);
+        for (Peer peer : peerList) {
+            channel.addPeer(peer);
+        }
+        channel.initialize();
+        return channel;
     }
 
     public void deployChaincode(HFClient hfClient, Channel channel, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException {
