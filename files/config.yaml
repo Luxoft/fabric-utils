@@ -1,0 +1,52 @@
+admins:
+    - org1.luxoft.com:
+        name: admin
+        cert: Admin@org1.example.com-cert.pem
+        privateKey: Admin@org1.example.com-cert.key
+        mspID: Org1MSP
+
+peers:
+    - peer1.luxoft.com:
+        url: grpcs://localhost:7051
+        pemFile: CA.pem
+        sslProvider: openSSL
+        negotiationType: TLS
+        hostnameOverride: peer0.org1.example.com
+    - peer2.luxoft.com:
+        url: grpcs://localhost:7056
+        pemFile: CA.pem
+        sslProvider: openSSL
+        negotiationType: TLS
+        hostnameOverride: peer1.org1.example.com
+
+orderers:
+    - orderer.luxoft.com:
+        url: grpcs://localhost:7050
+        pemFile: OrdererCA.pem
+        sslProvider: openSSL
+        negotiationType: TLS
+        hostnameOverride: orderer.example.com
+        waitTime: 10000L
+
+chaincodes:
+    - superchaincode:
+        id: mychcode
+        sourceLocation: map
+        sourceLocationPrefix: chaincode
+        version: v1
+        type: GO_LANG
+        endorsementPolicy: chaincodeendorsementpolicy.yaml
+        initArguments:
+            - blabla
+            - blabla
+
+channels:
+    - mychannel:
+        admin: org1.luxoft.com
+        orderer: orderer.luxoft.com
+        peers:
+            - peer1.luxoft.com
+            - peer2.luxoft.com
+        txFile: mychannel.tx
+        chaincodes:
+            - superchaincode
