@@ -36,7 +36,7 @@ public class FabricConfig extends YamlConfig {
     }
 
     public JsonNode getChannelDetails(String key) {
-        return getRoot().withArray("channels").findValue("mychannel");
+        return getRoot().withArray("channels").findValue(key);
     }
 
     public JsonNode getPeerDetails(String key) {
