@@ -70,7 +70,7 @@ public class Configurator {
                 Iterator<JsonNode> chaincodes = channelParameters.get("chaincodes").iterator();
                 while (chaincodes.hasNext()) {
                     String chaincodeKey = chaincodes.next().asText();
-                    fabricConfig.deployChaincode(hfClient, channel, peerList, chaincodeKey);
+                    fabricConfig.instantiateChaincode(hfClient, channel, peerList, chaincodeKey);
                 }
             } catch (Exception e) {
                 e.printStackTrace();

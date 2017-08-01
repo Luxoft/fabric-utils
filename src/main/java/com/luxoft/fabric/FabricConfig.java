@@ -116,9 +116,8 @@ public class FabricConfig extends YamlConfig {
         return hfClient.newPeer(peerName, peerUrl, peerProperties);
     }
 
-    public Channel getChannel(HFClient hfClient, String key) throws Exception {
-        String channelName = key;
-        JsonNode channelParameters = requireNonNull(getChannelDetails(key));
+    public Channel getChannel(HFClient hfClient, String channelName) throws Exception {
+        JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
         String adminKey = channelParameters.get("admin").asText();
         final User fabricUser = getAdmin(adminKey);
 
@@ -146,7 +145,7 @@ public class FabricConfig extends YamlConfig {
         return channel;
     }
 
-    public void deployChaincode(HFClient hfClient, Channel channel, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException {
+    public void instantiateChaincode(HFClient hfClient, Channel channel, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException {
         JsonNode chaincodeParameters = getChaincodeDetails(key);
 
         String chaincodeIDString = chaincodeParameters.get("id").asText();
@@ -189,13 +188,53 @@ public class FabricConfig extends YamlConfig {
         channel.sendTransaction(instantiateProposalResponses);
     }
 
+    public void upgradeChaincode(HFClient hfClient, Channel channel, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException {
+        JsonNode chaincodeParameters = getChaincodeDetails(key);
+
+        List<String> chaincodeInitArguments = new ArrayList<>();
+        chaincodeParameters.withArray("initArguments").forEach(element -> chaincodeInitArguments.add(element.asText()));
+
+        String chaincodePathPrefix = chaincodeParameters.path("sourceLocationPrefix").asText("chaincode");
+        String chaincodeIDString = chaincodeParameters.get("id").asText();
+        String chaincodePath = chaincodeParameters.get("sourceLocation").asText();
+        String chaincodeVersion = chaincodeParameters.path("version").asText("0");
+        String chaincodeType = chaincodeParameters.path("type").asText("GO_LANG");
+
+        ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
+
+        InstallProposalRequest installProposalRequest = hfClient.newInstallProposalRequest();
+        installProposalRequest.setChaincodeID(chaincodeID);
+        installProposalRequest.setChaincodeSourceLocation(new File(chaincodePathPrefix));
+        installProposalRequest.setChaincodeVersion(chaincodeVersion);
+        installProposalRequest.setChaincodeLanguage(TransactionRequest.Type.valueOf(chaincodeType));
+        Collection<ProposalResponse> installProposalResponse = hfClient.sendInstallProposal(installProposalRequest, peerList);
+
+        checkProposalResponse("install chaincode", installProposalResponse);
+
+        UpgradeProposalRequest upgradeProposalRequest = hfClient.newUpgradeProposalRequest();
+        upgradeProposalRequest.setChaincodeID(chaincodeID);
+        upgradeProposalRequest.setChaincodeVersion(chaincodeVersion);
+        upgradeProposalRequest.setProposalWaitTime(60000);
+        upgradeProposalRequest.setArgs(chaincodeInitArguments.stream().toArray(String[]::new));
+        Map<String, byte[]> tm = new HashMap<>();
+        tm.put("HyperLedgerFabric", "UpgradeProposalRequest:JavaSDK".getBytes(UTF_8));
+        tm.put("method", "UpgradeProposalRequest".getBytes(UTF_8));
+        upgradeProposalRequest.setTransientMap(tm);
+
+        Collection<ProposalResponse> upgradeProposalResponses = channel.sendUpgradeProposal(upgradeProposalRequest, peerList);
+
+        checkProposalResponse("upgrade chaincode", upgradeProposalResponses);
+        channel.sendTransaction(upgradeProposalResponses);
+    }
+
+
     private static void checkProposalResponse(String proposalType, Collection<ProposalResponse> proposalResponses) {
         for (ProposalResponse response : proposalResponses) {
             if (response.getStatus() == ProposalResponse.Status.SUCCESS) {
                 System.out.format("Successful %s proposal response Txid: %s from peer %s", proposalType, response.getTransactionID(), response.getPeer().getName());
                 System.out.println();
             } else {
-                throw new RuntimeException("Proposal failed on peer:" + response.getPeer().getName());
+                throw new RuntimeException("Proposal failed on peer:" + response.getPeer().getName() + " with reason: " + response.getMessage());
             }
         }
     }
