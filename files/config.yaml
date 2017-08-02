@@ -1,42 +1,30 @@
 admins:
-    - org1.luxoft.com:
+    - admin:
         name: admin
-        cert: Admin@org1.example.com-cert.pem
-        privateKey: Admin@org1.example.com-cert.key
+        cert: artifacts/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/signcerts/Admin@org1.example.com-cert.pem
+        privateKey: artifacts/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/keystore/5890f0061619c06fb29dea8cb304edecc020fe63f41a6db109f1e227cc1cb2a8_sk
         mspID: Org1MSP
 
 eventhubs:
-    - peer1.luxoft.com:
+    - eventhub:
         url: grpcs://localhost:7053
-        pemFile: CA.pem
+        pemFile: artifacts/crypto-config/peerOrganizations/org1.example.com/tlsca/tlsca.org1.example.com-cert.pem
         sslProvider: openSSL
         negotiationType: TLS
         hostnameOverride: peer0.org1.example.com
-    - peer2.luxoft.com:
-        url: grpcs://localhost:7058
-        pemFile: CA.pem
-        sslProvider: openSSL
-        negotiationType: TLS
-        hostnameOverride: peer1.org1.example.com
 
 peers:
-    - peer1.luxoft.com:
+    - peer:
         url: grpcs://localhost:7051
-        pemFile: CA.pem
+        pemFile: artifacts/crypto-config/peerOrganizations/org1.example.com/tlsca/tlsca.org1.example.com-cert.pem
         sslProvider: openSSL
         negotiationType: TLS
         hostnameOverride: peer0.org1.example.com
-    - peer2.luxoft.com:
-        url: grpcs://localhost:7056
-        pemFile: CA.pem
-        sslProvider: openSSL
-        negotiationType: TLS
-        hostnameOverride: peer1.org1.example.com
 
 orderers:
-    - orderer.luxoft.com:
+    - orderer:
         url: grpcs://localhost:7050
-        pemFile: OrdererCA.pem
+        pemFile: artifacts/crypto-config/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem
         sslProvider: openSSL
         negotiationType: TLS
         hostnameOverride: orderer.example.com
@@ -56,22 +44,20 @@ chaincodes:
 
 channels:
     - mychannel:
-        admin: org1.luxoft.com
-        orderer: orderer.luxoft.com
+        admin: admin
+        orderer: orderer
         peers:
-            - peer1.luxoft.com
-            - peer2.luxoft.com
+            - peer
         eventhubs:
-            - peer1.luxoft.com
-            - peer2.luxoft.com
-        txFile: mychannel.tx
+            - eventhub
+        txFile: artifacts/channel/mychannel.tx
         chaincodes:
             - superchaincode
 
 cas:
     - ca.org1.example.com:
         url: https://localhost:7054
-        pemFile: CA.pem
+        pemFile: artifacts/crypto-config/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem
         allowAllHostNames: true
         adminLogin: admin
         adminSecret: adminpw
