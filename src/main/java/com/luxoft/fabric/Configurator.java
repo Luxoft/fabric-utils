@@ -58,12 +58,23 @@ public class Configurator {
                     peerList.add(peer);
                 }
 
+                Iterator<JsonNode> eventhubs = channelParameters.get("eventhubs").iterator();
+                List<EventHub> eventhubList = new ArrayList<>();
+                while (eventhubs.hasNext()) {
+                    String eventhubKey = eventhubs.next().asText();
+                    EventHub eventhub = fabricConfig.getNewEventhub(hfClient, eventhubKey);
+                    eventhubList.add(eventhub);
+                }
+
                 String txFile = channelParameters.get("txFile").asText();
                 ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
                 byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, fabricUser);
                 Channel channel = hfClient.newChannel(channelName, orderer, channelConfiguration, channelConfigurationSignature);
                 for (Peer peer : peerList) {
                     channel.joinPeer(peer);
+                }
+                for (EventHub eventhub : eventhubList) {
+                    channel.addEventHub(eventhub);
                 }
                 channel.initialize();
 

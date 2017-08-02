@@ -5,6 +5,20 @@ admins:
         privateKey: Admin@org1.example.com-cert.key
         mspID: Org1MSP
 
+eventhubs:
+    - peer1.luxoft.com:
+        url: grpcs://localhost:7053
+        pemFile: CA.pem
+        sslProvider: openSSL
+        negotiationType: TLS
+        hostnameOverride: peer0.org1.example.com
+    - peer2.luxoft.com:
+        url: grpcs://localhost:7058
+        pemFile: CA.pem
+        sslProvider: openSSL
+        negotiationType: TLS
+        hostnameOverride: peer1.org1.example.com
+
 peers:
     - peer1.luxoft.com:
         url: grpcs://localhost:7051
@@ -26,7 +40,7 @@ orderers:
         sslProvider: openSSL
         negotiationType: TLS
         hostnameOverride: orderer.example.com
-        waitTime: 10000L
+        waitTime: 10000
 
 chaincodes:
     - superchaincode:
@@ -45,6 +59,9 @@ channels:
         admin: org1.luxoft.com
         orderer: orderer.luxoft.com
         peers:
+            - peer1.luxoft.com
+            - peer2.luxoft.com
+        eventhubs:
             - peer1.luxoft.com
             - peer2.luxoft.com
         txFile: mychannel.tx

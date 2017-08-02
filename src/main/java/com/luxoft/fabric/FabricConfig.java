@@ -47,6 +47,10 @@ public class FabricConfig extends YamlConfig {
         return getRoot().get("peers").findValue(key);
     }
 
+    public JsonNode getEventhubDetails(String key) {
+        return getRoot().get("eventhubs").findValue(key);
+    }
+
     public JsonNode getOrdererDetails(String key) {
         return getRoot().get("orderers").findValue(key);
     }
@@ -124,6 +128,30 @@ public class FabricConfig extends YamlConfig {
         return hfClient.newPeer(peerName, peerUrl, peerProperties);
     }
 
+    public EventHub getNewEventhub(HFClient hfClient, String key) throws InvalidArgumentException {
+        JsonNode eventhubParameters = requireNonNull(getEventhubDetails(key));
+
+        String eventhubUrl = eventhubParameters.get("url").asText();
+
+        String eventhubName = eventhubParameters.path("name").asText(key);
+        String eventhubPemFile = eventhubParameters.path("pemFile").asText("");
+        String eventhubSSLProvider = eventhubParameters.path("sslProvider").asText("openSSL");
+        String eventhubNegotiationType = eventhubParameters.path("negotiationType").asText("TLS");
+        String eventhubHostnameOverride = eventhubParameters.path("hostnameOverride").asText("");
+
+        Properties eventhubProperties = null;
+        if (!eventhubPemFile.isEmpty()) {
+            eventhubProperties = new Properties();
+            eventhubProperties.setProperty("pemFile", eventhubPemFile);
+            eventhubProperties.setProperty("sslProvider", eventhubSSLProvider);
+            eventhubProperties.setProperty("negotiationType", eventhubNegotiationType);
+            if (!eventhubHostnameOverride.isEmpty())
+                eventhubProperties.setProperty("hostnameOverride", eventhubHostnameOverride);
+        }
+
+        return hfClient.newEventHub(eventhubName, eventhubUrl, eventhubProperties);
+    }
+
     public Channel getChannel(HFClient hfClient, String channelName) throws Exception {
         JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
         String adminKey = channelParameters.get("admin").asText();
@@ -144,10 +172,21 @@ public class FabricConfig extends YamlConfig {
             peerList.add(peer);
         }
 
+        Iterator<JsonNode> eventhubs = channelParameters.get("eventhubs").iterator();
+        List<EventHub> eventhubList = new ArrayList<>();
+        while (eventhubs.hasNext()) {
+            String eventhubKey = eventhubs.next().asText();
+            EventHub eventhub = getNewEventhub(hfClient, eventhubKey);
+            eventhubList.add(eventhub);
+        }
+
         Channel channel = hfClient.newChannel(channelName);
         channel.addOrderer(orderer);
         for (Peer peer : peerList) {
             channel.addPeer(peer);
+        }
+        for (EventHub eventhub : eventhubList) {
+            channel.addEventHub(eventhub);
         }
         channel.initialize();
         return channel;
