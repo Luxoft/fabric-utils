@@ -18,7 +18,7 @@ import java.util.Map;
  */
 public class Configurator {
 
-    private static Reader getConfigReader() {
+    public static Reader getConfigReader() {
         try {
             return new FileReader("config.yaml");
         } catch (FileNotFoundException e) {

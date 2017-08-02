@@ -50,3 +50,12 @@ channels:
         txFile: mychannel.tx
         chaincodes:
             - superchaincode
+
+cas:
+    - ca.org1.example.com:
+        url: https://localhost:7054
+        pemFile: CA.pem
+        allowAllHostNames: true
+        adminLogin: admin
+        adminSecret: adminpw
+        mspID: Org1MSP

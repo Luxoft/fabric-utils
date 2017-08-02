@@ -11,8 +11,12 @@ import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.ChaincodeEndorsementPolicyParseException;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
+import org.hyperledger.fabric.sdk.security.CryptoSuite;
+import org.hyperledger.fabric_ca.sdk.HFCAClient;
+import org.hyperledger.fabric_ca.sdk.RegistrationRequest;
 
 import java.io.*;
+import java.net.MalformedURLException;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
@@ -53,6 +57,10 @@ public class FabricConfig extends YamlConfig {
 
     public JsonNode getAdminDetails(String key) {
         return getRoot().get("admins").findValue(key);
+    }
+
+    public JsonNode getCADetails(String key) {
+        return getRoot().get("cas").findValue(key);
     }
 
     public User getAdmin(String key) throws Exception {
@@ -250,5 +258,70 @@ public class FabricConfig extends YamlConfig {
         PrivateKey privateKey = getPrivateKeyFromBytes(IOUtils.toByteArray(privateKeyFile));
 
         return new FabricUserEnrollment(privateKey, IOUtils.toString(certFile));
+    }
+
+    public HFCAClient createHFCAClient(String caKey) throws MalformedURLException {
+        JsonNode caParameters = getCADetails(caKey);
+        Properties properties = null;
+
+        String caUrl = caParameters.get("url").asText();
+
+        String caCertPem = caParameters.path("pemFile").asText("");
+        String caAllowAllHostNames = caParameters.path("allowAllHostNames").asText("");
+
+        if (!caCertPem.isEmpty()) {
+            properties = new Properties();
+            properties.setProperty("pemFile", caCertPem);
+            if (!caAllowAllHostNames.isEmpty())
+                properties.setProperty("allowAllHostNames", caAllowAllHostNames);
+        }
+        HFCAClient hfcaClient = HFCAClient.createNewInstance(caUrl, properties);
+        return hfcaClient;
+    }
+
+    public HFCAClient createHFCAClient(String caKey, CryptoSuite cryptoSuite) throws MalformedURLException {
+        if (cryptoSuite == null)
+            cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
+        HFCAClient hfcaClient = createHFCAClient(caKey);
+        hfcaClient.setCryptoSuite(cryptoSuite);
+        return hfcaClient;
+    }
+
+    public User enrollAdmin(String caKey) throws Exception {
+        return enrollAdmin(createHFCAClient(caKey, null), caKey);
+    }
+
+    public User enrollAdmin(HFCAClient hfcaClient, String caKey) throws Exception {
+        JsonNode caParameters = getCADetails(caKey);
+        String caAdminLogin = caParameters.get("adminLogin").asText();
+        String caAdminSecret = caParameters.get("adminSecret").asText();
+        String caMspID = caParameters.get("mspID").asText();
+        Enrollment adminEnrollment = hfcaClient.enroll(caAdminLogin, caAdminSecret);
+        User adminUser = new FabricUser(caAdminLogin, null, null, adminEnrollment, caMspID);
+        return adminUser;
+    }
+
+    public String registerUser(String caKey, String userName, String userAffiliation) throws Exception {
+        HFCAClient hfcaClient = createHFCAClient(caKey, null);
+        User admin = enrollAdmin(hfcaClient, caKey);
+        return registerUser(hfcaClient, admin, userName, userAffiliation);
+    }
+
+    public static String registerUser(HFCAClient hfcaClient, User admin, String userName, String userAffiliation) throws Exception {
+        RegistrationRequest registrationRequest = new RegistrationRequest(userName, userAffiliation);
+        return hfcaClient.register(registrationRequest, admin);
+    }
+
+    public User enrollUser(String caKey, String userName, String userSecret) throws Exception {
+        JsonNode caParameters = getCADetails(caKey);
+        String caMspID = caParameters.get("mspID").asText();
+        HFCAClient hfcaClient = createHFCAClient(caKey, null);
+        return enrollUser(hfcaClient, userName, userSecret, caMspID);
+    }
+
+    public static User enrollUser(HFCAClient hfcaClient, String userName, String userSecret, String mspID) throws Exception {
+        Enrollment adminEnrollment = hfcaClient.enroll(userName, userSecret);
+        User user = new FabricUser(userName, null, null, adminEnrollment, mspID);
+        return user;
     }
 }
