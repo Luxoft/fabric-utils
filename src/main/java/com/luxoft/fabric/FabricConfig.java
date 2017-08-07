@@ -15,6 +15,7 @@ import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.hyperledger.fabric_ca.sdk.HFCAClient;
 import org.hyperledger.fabric_ca.sdk.RegistrationRequest;
 
+import javax.xml.bind.DatatypeConverter;
 import java.io.*;
 import java.net.MalformedURLException;
 import java.security.NoSuchAlgorithmException;
@@ -219,7 +220,7 @@ public class FabricConfig extends YamlConfig {
         instantiateProposalRequest.setProposalWaitTime(60000);
         instantiateProposalRequest.setChaincodeID(chaincodeID);
         instantiateProposalRequest.setFcn("init");
-        instantiateProposalRequest.setArgs(chaincodeInitArguments.stream().toArray(String[]::new));
+        instantiateProposalRequest.setArgs(chaincodeInitArguments.stream().map(DatatypeConverter::parseBase64Binary).map(bytes -> new String(bytes, UTF_8)).toArray(String[]::new));
         Map<String, byte[]> tm = new HashMap<>();
         tm.put("HyperLedgerFabric", "InstantiateProposalRequest:JavaSDK".getBytes(UTF_8));
         tm.put("method", "InstantiateProposalRequest".getBytes(UTF_8));
@@ -262,7 +263,7 @@ public class FabricConfig extends YamlConfig {
         upgradeProposalRequest.setChaincodeID(chaincodeID);
         upgradeProposalRequest.setChaincodeVersion(chaincodeVersion);
         upgradeProposalRequest.setProposalWaitTime(60000);
-        upgradeProposalRequest.setArgs(chaincodeInitArguments.stream().toArray(String[]::new));
+        upgradeProposalRequest.setArgs(chaincodeInitArguments.stream().map(DatatypeConverter::parseBase64Binary).map(bytes -> new String(bytes, UTF_8)).toArray(String[]::new));
         Map<String, byte[]> tm = new HashMap<>();
         tm.put("HyperLedgerFabric", "UpgradeProposalRequest:JavaSDK".getBytes(UTF_8));
         tm.put("method", "UpgradeProposalRequest".getBytes(UTF_8));

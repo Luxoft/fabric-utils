@@ -51,8 +51,8 @@ chaincodes:
         type: GO_LANG
         endorsementPolicy: chaincodeendorsementpolicy.yaml
         initArguments:
-            - blabla
-            - blabla
+            - QmxhYmxh
+            - QmxhYmxhMg==
 
 channels:
     - mychannel:
