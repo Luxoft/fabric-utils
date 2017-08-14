@@ -156,7 +156,12 @@ public class FabricConfig extends YamlConfig {
         JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
         String adminKey = channelParameters.get("admin").asText();
         final User fabricUser = getAdmin(adminKey);
+        return getChannel(hfClient, channelName, fabricUser);
+    }
 
+    public Channel getChannel(HFClient hfClient, String channelName, User fabricUser) throws Exception {
+        JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
+        requireNonNull(fabricUser);
         hfClient.setUserContext(fabricUser);
 
         String ordererName = channelParameters.get("orderer").asText();

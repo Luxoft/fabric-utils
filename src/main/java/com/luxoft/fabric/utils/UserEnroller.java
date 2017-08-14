@@ -1,6 +1,7 @@
-package com.luxoft.fabric;
+package com.luxoft.fabric.utils;
 
 import com.luxoft.YamlConfig;
+import com.luxoft.fabric.FabricConfig;
 import org.apache.commons.io.FileUtils;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemWriter;
@@ -10,12 +11,10 @@ import org.hyperledger.fabric_ca.sdk.HFCAClient;
 import java.io.*;
 import java.security.Key;
 
-import static com.luxoft.fabric.Configurator.getConfigReader;
-
 /**
  * Created by ADoroganov on 11.08.2017.
  */
-public class FabricUserEnroller {
+public class UserEnroller {
 
     private static BufferedReader getUsersReader(String path) {
         try {
@@ -39,7 +38,7 @@ public class FabricUserEnroller {
 
     public static void main(String[] args) throws Exception {
         YamlConfig config = new YamlConfig(null);
-        FabricConfig fabricConfig = new FabricConfig(getConfigReader());
+        FabricConfig fabricConfig = new FabricConfig(Configurator.getConfigReader());
 
         String caKey = config.getValue(String.class, "ca_key", null);
         if (caKey == null)

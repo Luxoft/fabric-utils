@@ -1,6 +1,7 @@
-package com.luxoft.fabric;
+package com.luxoft.fabric.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.luxoft.fabric.FabricConfig;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 
