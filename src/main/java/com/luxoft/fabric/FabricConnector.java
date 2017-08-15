@@ -134,4 +134,8 @@ public class FabricConnector {
     public CompletableFuture<byte[]> query(String function, String chaincode, byte[]... message) {
         return sendQueryRequest(buildQueryRequest(function, chaincode, message));
     }
+
+    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, byte[]... message) throws Exception {
+        return buildTransactionFuture(buildProposalRequest(function, chaincode, message));
+    }
 }
