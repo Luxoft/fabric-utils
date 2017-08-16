@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.YamlConfig;
 import org.apache.commons.io.IOUtils;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.hyperledger.fabric.sdk.*;
@@ -30,6 +29,11 @@ import static java.util.Objects.requireNonNull;
  * Created by ADoroganov on 25.07.2017.
  */
 public class FabricConfig extends YamlConfig {
+
+    static {
+        //loading Fabric security provider to the system
+        CryptoSuite.Factory.getCryptoSuite();
+    }
 
     public FabricConfig(Reader configReader) throws IOException {
         super(configReader);
@@ -294,7 +298,7 @@ public class FabricConfig extends YamlConfig {
     private static PrivateKey getPrivateKeyFromBytes(byte[] data) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, InvalidKeySpecException {
         final PEMParser pemParser = new PEMParser(new StringReader(new String(data)));
         PrivateKeyInfo pemPair = (PrivateKeyInfo) pemParser.readObject();
-        PrivateKey privateKey = new JcaPEMKeyConverter().setProvider(BouncyCastleProvider.PROVIDER_NAME).getPrivateKey(pemPair);
+        PrivateKey privateKey = new JcaPEMKeyConverter().getPrivateKey(pemPair);
         return privateKey;
     }
 

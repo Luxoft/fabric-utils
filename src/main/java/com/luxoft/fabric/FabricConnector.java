@@ -54,7 +54,7 @@ public class FabricConnector {
         return transactionProposalRequest;
     }
 
-    public CompletableFuture<Collection<ProposalResponse>> buildProposalFuture(TransactionProposalRequest transactionProposalRequest, boolean returnOnlySuccessful) throws Exception {
+    public CompletableFuture<Collection<ProposalResponse>> buildProposalFuture(TransactionProposalRequest transactionProposalRequest, boolean returnOnlySuccessful) {
 
         return CompletableFuture.supplyAsync(() -> {
             try {
@@ -89,7 +89,7 @@ public class FabricConnector {
         });
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> buildTransactionFuture(TransactionProposalRequest transactionProposalRequest) throws Exception {
+    public CompletableFuture<BlockEvent.TransactionEvent> buildTransactionFuture(TransactionProposalRequest transactionProposalRequest) {
 
         return buildProposalFuture(transactionProposalRequest, true).thenCompose(proposalResponses -> {
             CompletableFuture<BlockEvent.TransactionEvent> future = null;
