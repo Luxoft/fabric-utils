@@ -38,7 +38,7 @@ public class UserEnroller {
 
     public static void main(String[] args) throws Exception {
         YamlConfig config = new YamlConfig(null);
-        FabricConfig fabricConfig = new FabricConfig(Configurator.getConfigReader());
+        FabricConfig fabricConfig = new FabricConfig(Configurator.getConfigReader("config.yaml"));
 
         String caKey = config.getValue(String.class, "ca_key", null);
         if (caKey == null)
