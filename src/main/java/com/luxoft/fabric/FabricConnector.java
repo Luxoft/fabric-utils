@@ -116,10 +116,12 @@ public class FabricConnector {
 
     public CompletableFuture<byte[]> sendQueryRequest(QueryByChaincodeRequest request) {
         return CompletableFuture.supplyAsync(() -> {
+            String lastFailReason = "no responses received";
             try {
                 final Collection<ProposalResponse> proposalResponses = channel.queryByChaincode(request);
                 for (ProposalResponse proposalResponse : proposalResponses) {
                     if (!proposalResponse.isVerified() || proposalResponse.getStatus() != ProposalResponse.Status.SUCCESS) {
+                        lastFailReason = proposalResponse.getMessage();
                         continue;
                     }
                     return proposalResponse.getChaincodeActionResponsePayload();
@@ -127,7 +129,7 @@ public class FabricConnector {
             } catch (Exception e) {
                 throw new RuntimeException("Unable to send query", e);
             }
-            throw new RuntimeException("Unable to send query");
+            throw new RuntimeException("Unable to send query, because: " + lastFailReason);
         });
     }
 
