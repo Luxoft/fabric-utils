@@ -13,6 +13,8 @@ import org.hyperledger.fabric.sdk.exception.ProposalException;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.hyperledger.fabric_ca.sdk.HFCAClient;
 import org.hyperledger.fabric_ca.sdk.RegistrationRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.MalformedURLException;
@@ -29,6 +31,8 @@ import static java.util.Objects.requireNonNull;
  * Created by ADoroganov on 25.07.2017.
  */
 public class FabricConfig extends YamlConfig {
+
+    private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
     static {
         //loading Fabric security provider to the system
@@ -284,11 +288,10 @@ public class FabricConfig extends YamlConfig {
     }
 
 
-    private static void checkProposalResponse(String proposalType, Collection<ProposalResponse> proposalResponses) {
+    private void checkProposalResponse(String proposalType, Collection<ProposalResponse> proposalResponses) {
         for (ProposalResponse response : proposalResponses) {
             if (response.getStatus() == ProposalResponse.Status.SUCCESS) {
-                System.out.format("Successful %s proposal response Txid: %s from peer %s", proposalType, response.getTransactionID(), response.getPeer().getName());
-                System.out.println();
+                logger.info("Successful {} proposal response Txid: {} from peer {}", proposalType, response.getTransactionID(), response.getPeer().getName());
             } else {
                 throw new RuntimeException("Proposal failed on peer:" + response.getPeer().getName() + " with reason: " + response.getMessage());
             }

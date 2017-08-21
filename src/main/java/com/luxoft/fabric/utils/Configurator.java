@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.FabricConfig;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -18,6 +20,8 @@ import java.util.Map;
  * Created by ADoroganov on 25.07.2017.
  */
 public class Configurator {
+
+    private static final Logger logger = LoggerFactory.getLogger(Configurator.class);
 
     public static Reader getConfigReader() {
         try {
@@ -85,8 +89,7 @@ public class Configurator {
                     fabricConfig.instantiateChaincode(hfClient, channel, peerList, chaincodeKey);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
-                System.out.println("Failed to process channel:" + channelName);
+                logger.error("Failed to process channel:" + channelName, e);
             }
         }
     }
