@@ -159,7 +159,7 @@ public class Configurator {
         Configurator cfg = new Configurator();
 
         FabricConfig fabricConfig = new FabricConfig(getConfigReader(options.has(config)
-                ? options.valueOf(config) : "config.yaml"));
+                ? options.valueOf(config) : "fabric.yaml"));
 
         FabricNetwork network = new FabricNetwork(fabricConfig);
 
