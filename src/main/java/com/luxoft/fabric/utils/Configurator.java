@@ -6,20 +6,28 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 import org.hyperledger.fabric.sdk.*;
+
 import org.hyperledger.fabric.sdk.exception.ChaincodeEndorsementPolicyParseException;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+
 import java.io.*;
 import java.util.*;
-import java.util.logging.Level;
 
 /**
  * Created by ADoroganov on 25.07.2017.
  */
 public class Configurator {
 
+    private static final Logger logger = LoggerFactory.getLogger(Configurator.class);
+
     public static Reader getConfigReader(String configFile) {
+
+
         try {
             return new FileReader(configFile);
         } catch (FileNotFoundException e) {
@@ -90,8 +98,7 @@ public class Configurator {
                 }
 
             } catch (Exception e) {
-                e.printStackTrace();
-                System.out.println("Failed to process channel:" + channelName);
+                logger.error("Failed to process channel:" + channelName, e);
             }
         }
     }

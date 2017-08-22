@@ -2,6 +2,8 @@ package com.luxoft.fabric;
 
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -13,6 +15,8 @@ import java.util.concurrent.CompletableFuture;
  * Created by nvolkov on 26.07.17.
  */
 public class FabricConnector {
+
+    private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
     protected final Channel channel;
     protected HFClient hfClient;
@@ -64,9 +68,10 @@ public class FabricConnector {
                 if (returnOnlySuccessful) {
                     for (ProposalResponse response : proposalResponses) {
                         if (response.getStatus() == ProposalResponse.Status.SUCCESS) {
-                            System.out.printf("Successful transaction proposal response Txid: %s from peer %s\n", response.getTransactionID(), response.getPeer().getName());
+                            logger.info("Successful transaction proposal response Txid: {} from peer {}", response.getTransactionID(), response.getPeer().getName());
                             successful.add(response);
-                        }
+                        } else
+                            logger.warn("Unsuccessful transaction proposal response Txid: {} from peer {}, reason: {}", response.getTransactionID(), response.getPeer().getName(), response.getMessage());
                     }
 
                     // Check that all the proposals are consistent with each other. We should have only one set
@@ -96,7 +101,7 @@ public class FabricConnector {
             try {
                 future = channel.sendTransaction(proposalResponses);
             } catch (Exception e) {
-                e.printStackTrace();
+                logger.error("Failed to send transaction to channel", e);
             }
 
             return future;
@@ -116,10 +121,12 @@ public class FabricConnector {
 
     public CompletableFuture<byte[]> sendQueryRequest(QueryByChaincodeRequest request) {
         return CompletableFuture.supplyAsync(() -> {
+            String lastFailReason = "no responses received";
             try {
                 final Collection<ProposalResponse> proposalResponses = channel.queryByChaincode(request);
                 for (ProposalResponse proposalResponse : proposalResponses) {
                     if (!proposalResponse.isVerified() || proposalResponse.getStatus() != ProposalResponse.Status.SUCCESS) {
+                        lastFailReason = proposalResponse.getMessage();
                         continue;
                     }
                     return proposalResponse.getChaincodeActionResponsePayload();
@@ -127,7 +134,7 @@ public class FabricConnector {
             } catch (Exception e) {
                 throw new RuntimeException("Unable to send query", e);
             }
-            throw new RuntimeException("Unable to send query");
+            throw new RuntimeException("Unable to send query, because: " + lastFailReason);
         });
     }
 

@@ -7,6 +7,8 @@ import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemWriter;
 import org.hyperledger.fabric.sdk.User;
 import org.hyperledger.fabric_ca.sdk.HFCAClient;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.security.Key;
@@ -15,6 +17,8 @@ import java.security.Key;
  * Created by ADoroganov on 11.08.2017.
  */
 public class UserEnroller {
+
+    private static final Logger logger = LoggerFactory.getLogger(UserEnroller.class);
 
     private static BufferedReader getUsersReader(String path) {
         try {
@@ -51,8 +55,8 @@ public class UserEnroller {
         String destFilesRootPath = config.getValue(String.class, "dest_file_path", "users/");
         String certFileName = config.getValue(String.class, "cert_file_name", "cert.pem");
         String privateKeyFileName = config.getValue(String.class, "pk_file_name", "pk.pem");
-        System.out.println("Enrolling users at CA " + caKey);
-        System.out.printf("Reading users from (%s), with affiliation (%s) and storing at (%s%%username%%) with cert in (%s) and pk in (%s)\n",
+        logger.info("Enrolling users at CA {}", caKey);
+        logger.info("Reading users from ({}), with affiliation ({}) and storing at ({}%%username%%) with cert in ({}) and pk in ({})",
                 userFilePath, userAffiliation, destFilesRootPath, certFileName, privateKeyFileName);
 
         BufferedReader usersReader = getUsersReader(userFilePath);
@@ -60,7 +64,7 @@ public class UserEnroller {
         long cnt = 0;
 
         while (userName != null) {
-            System.out.println("Processing user " + userName);
+            logger.info("Processing user " + userName);
             HFCAClient hfcaClient = fabricConfig.createHFCAClient(caKey, null);
             User admin = fabricConfig.enrollAdmin(hfcaClient, caKey);
             String mspId = admin.getMspId();
@@ -75,12 +79,11 @@ public class UserEnroller {
                 FileUtils.writeStringToFile(certFile, user.getEnrollment().getCert());
                 cnt++;
             } catch (Exception e) {
-                System.out.printf("Failed to process user %s, reason: \n%s\n", userName, e.getMessage());
-                e.printStackTrace();
+                logger.error("Failed to process user {}", userName, e);
             }
             userName = usersReader.readLine();
         }
-        System.out.println("Finished, successfully processed user count: " + cnt);
+        logger.info("Finished, successfully processed user count: {}", cnt);
     }
 
 }
