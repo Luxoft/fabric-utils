@@ -6,11 +6,6 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 import org.hyperledger.fabric.sdk.*;
-
-import org.hyperledger.fabric.sdk.exception.ChaincodeEndorsementPolicyParseException;
-import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
-import org.hyperledger.fabric.sdk.exception.ProposalException;
-
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,8 +113,7 @@ public class Configurator {
         }
     }
 
-    private void deployChancodes(final FabricNetwork network, final FabricConfig fabricConfig, Set<String> names)
-            throws IOException, ChaincodeEndorsementPolicyParseException, ProposalException, InvalidArgumentException {
+    private void deployChancodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {
 
         Iterator<JsonNode> channels = fabricConfig.getChannels();
         while(channels.hasNext()) {
@@ -127,13 +121,18 @@ public class Configurator {
 
             String channelName = channelObject.getKey();
 
+            String adminKey = channelObject.getValue().get("admin").asText();
+            final User fabricUser = fabricConfig.getAdmin(adminKey);
+            hfc.setUserContext(fabricUser);
+
+            fabricConfig.getChannel(hfc, channelName);
+
             for (JsonNode jsonNode : channelObject.getValue().get("chaincodes")) {
                 String chaincodeName = jsonNode.asText();
                 if (!names.isEmpty()) {
                     if (!names.contains(chaincodeName)) continue;
                 }
 
-                HFClient hfc = network.getClient(channelName);
                 Channel channel = hfc.getChannel(channelName);
                 List<Peer> peers = new ArrayList<>(channel.getPeers());
 
@@ -142,8 +141,7 @@ public class Configurator {
         }
     }
 
-    private void upgradeChancodes(final FabricNetwork network, final FabricConfig fabricConfig, Set<String> names)
-            throws IOException, ChaincodeEndorsementPolicyParseException, ProposalException, InvalidArgumentException {
+    private void upgradeChancodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {
 
         Iterator<JsonNode> channels = fabricConfig.getChannels();
         while(channels.hasNext()) {
@@ -151,13 +149,18 @@ public class Configurator {
 
             String channelName = channelObject.getKey();
 
+            String adminKey = channelObject.getValue().get("admin").asText();
+            final User fabricUser = fabricConfig.getAdmin(adminKey);
+            hfc.setUserContext(fabricUser);
+
+            fabricConfig.getChannel(hfc, channelName);
+
             for (JsonNode jsonNode : channelObject.getValue().get("chaincodes")) {
                 String chaincodeName = jsonNode.asText();
                 if (!names.isEmpty()) {
                     if (!names.contains(chaincodeName)) continue;
                 }
 
-                HFClient hfc = network.getClient(channelName);
                 Channel channel = hfc.getChannel(channelName);
                 List<Peer> peers = new ArrayList<>(channel.getPeers());
 
@@ -185,16 +188,18 @@ public class Configurator {
         if(!options.has(type) || mode.equals(Arguments.CONFIG))
             cfg.configNetwork(fabricConfig);
         else {
-            FabricNetwork network = new FabricNetwork(fabricConfig);
+
+            HFClient hfClient = HFClient.createNewInstance();
+            hfClient.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
 
             Set<String> names = options.has(name)
                     ? new HashSet<>(options.valuesOf(name))
                     : Collections.EMPTY_SET;
 
             if (mode.equals(Arguments.DEPLOY))
-                cfg.deployChancodes(network, fabricConfig, names);
+                cfg.deployChancodes(hfClient, fabricConfig, names);
             else if (mode.equals(Arguments.UPGRADE))
-                cfg.upgradeChancodes(network, fabricConfig, names);
+                cfg.upgradeChancodes(hfClient, fabricConfig, names);
         }
     }
 }
