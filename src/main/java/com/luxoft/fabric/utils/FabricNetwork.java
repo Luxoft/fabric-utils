@@ -7,7 +7,6 @@ import org.hyperledger.fabric.sdk.exception.CryptoException;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 
-import java.io.File;
 import java.util.*;
 
 /**
@@ -15,9 +14,7 @@ import java.util.*;
  */
 public class FabricNetwork {
 
-    HashMap<String, HFClient> channelClient  = new HashMap<>();
-    HashMap<String, List<Peer>> channelPeers = new HashMap<>();
-    HashMap<String, Orderer> channelOrderer  = new HashMap<>();
+    private HashMap<String, HFClient> channelClient  = new HashMap<>();
 
     public FabricNetwork(FabricConfig fabricConfig) throws CryptoException, InvalidArgumentException {
 
@@ -38,22 +35,10 @@ public class FabricNetwork {
                 hfClient.setCryptoSuite(cryptoSuite);
                 hfClient.setUserContext(fabricUser);
 
-                Iterator<JsonNode> peers = channelParameters.get("peers").iterator();
-                if (!peers.hasNext())
-                    throw new RuntimeException("Peers list can`t be empty");
-                List<Peer> peerList = new ArrayList<>();
-                while (peers.hasNext()) {
-                    String peerKey = peers.next().asText();
-                    Peer peer = fabricConfig.getNewPeer(hfClient, peerKey);
-                    peerList.add(peer);
-                }
-
-                String ordererName = channelParameters.get("orderer").asText();
-                Orderer orderer = fabricConfig.getNewOrderer(hfClient, ordererName);
+                // init channel
+                fabricConfig.getChannel(hfClient, channelName);
 
                 channelClient.put(channelName, hfClient);
-                channelPeers.put(channelName, peerList);
-                channelOrderer.put(channelName, orderer);
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -64,13 +49,5 @@ public class FabricNetwork {
 
     public HFClient getClient(String channel) {
         return channelClient.get(channel);
-    }
-
-    public List<Peer> getPeers(String channel) {
-        return channelPeers.get(channel);
-    }
-
-    public Orderer getOrderer(String channel) {
-        return channelOrderer.get(channel);
     }
 }

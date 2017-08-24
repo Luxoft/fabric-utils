@@ -1,6 +1,6 @@
 group 'com.luxoft'
 
-version '1.2.0-beta'
+version '1.2.2-beta'
 
 apply plugin: 'java'
 
