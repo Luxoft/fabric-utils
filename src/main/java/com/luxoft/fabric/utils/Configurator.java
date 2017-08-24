@@ -113,8 +113,7 @@ public class Configurator {
                     fabricConfig.instantiateChaincode(hfClient, channel, peerList, chaincodeKey);
                 }
             } catch (Exception e) {
-                e.printStackTrace();
-                System.out.println("Failed to process channel:" + channelName);
+               logger.error("Failed to process channel:" + channelName, e);
             }
         }
     }
