@@ -25,13 +25,6 @@ public class YamlConfig {
     public JsonNode getRoot() {
         return config;
     }
-//
-//    public static String getData(JsonNode node, String field) {
-//        JsonNode fieldData = node.get(field);
-//        if (fieldData == null)
-//            throw new RuntimeException("Field (" + field + ")is null");
-//        return fieldData.asText()
-//    }
 
     public <T> T getValue(Class<T> tClass, String path, T defValue) {
         String s = System.getenv(path);

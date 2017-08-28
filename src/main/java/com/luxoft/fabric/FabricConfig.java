@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.YamlConfig;
 import org.apache.commons.io.IOUtils;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.hyperledger.fabric.sdk.*;
@@ -14,6 +13,8 @@ import org.hyperledger.fabric.sdk.exception.ProposalException;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.hyperledger.fabric_ca.sdk.HFCAClient;
 import org.hyperledger.fabric_ca.sdk.RegistrationRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.MalformedURLException;
@@ -30,6 +31,13 @@ import static java.util.Objects.requireNonNull;
  * Created by ADoroganov on 25.07.2017.
  */
 public class FabricConfig extends YamlConfig {
+
+    private final Logger logger = LoggerFactory.getLogger(this.getClass());
+
+    static {
+        //loading Fabric security provider to the system
+        CryptoSuite.Factory.getCryptoSuite();
+    }
 
     public FabricConfig(Reader configReader) throws IOException {
         super(configReader);
@@ -156,7 +164,12 @@ public class FabricConfig extends YamlConfig {
         JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
         String adminKey = channelParameters.get("admin").asText();
         final User fabricUser = getAdmin(adminKey);
+        return getChannel(hfClient, channelName, fabricUser);
+    }
 
+    public Channel getChannel(HFClient hfClient, String channelName, User fabricUser) throws Exception {
+        JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
+        requireNonNull(fabricUser);
         hfClient.setUserContext(fabricUser);
 
         String ordererName = channelParameters.get("orderer").asText();
@@ -275,11 +288,10 @@ public class FabricConfig extends YamlConfig {
     }
 
 
-    private static void checkProposalResponse(String proposalType, Collection<ProposalResponse> proposalResponses) {
+    private void checkProposalResponse(String proposalType, Collection<ProposalResponse> proposalResponses) {
         for (ProposalResponse response : proposalResponses) {
             if (response.getStatus() == ProposalResponse.Status.SUCCESS) {
-                System.out.format("Successful %s proposal response Txid: %s from peer %s", proposalType, response.getTransactionID(), response.getPeer().getName());
-                System.out.println();
+                logger.info("Successful {} proposal response Txid: {} from peer {}", proposalType, response.getTransactionID(), response.getPeer().getName());
             } else {
                 throw new RuntimeException("Proposal failed on peer:" + response.getPeer().getName() + " with reason: " + response.getMessage());
             }
@@ -289,7 +301,7 @@ public class FabricConfig extends YamlConfig {
     private static PrivateKey getPrivateKeyFromBytes(byte[] data) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, InvalidKeySpecException {
         final PEMParser pemParser = new PEMParser(new StringReader(new String(data)));
         PrivateKeyInfo pemPair = (PrivateKeyInfo) pemParser.readObject();
-        PrivateKey privateKey = new JcaPEMKeyConverter().setProvider(BouncyCastleProvider.PROVIDER_NAME).getPrivateKey(pemPair);
+        PrivateKey privateKey = new JcaPEMKeyConverter().getPrivateKey(pemPair);
         return privateKey;
     }
 
