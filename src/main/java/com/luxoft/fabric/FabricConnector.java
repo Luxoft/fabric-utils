@@ -18,22 +18,40 @@ public class FabricConnector {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    protected final Channel channel;
-    protected HFClient hfClient;
-    protected FabricConfig fabricConfig;
+    private HFClient hfClient;
+    private FabricConfig fabricConfig;
 
-    public FabricConnector(String channelName, FabricConfig fabricConfig) throws Exception {
-        this(null, channelName, fabricConfig);
+    private String defaultChannelName;
+
+    public FabricConnector(FabricConfig fabricConfig) throws Exception {
+        this(null, null, fabricConfig);
     }
 
-    public FabricConnector(User user, String channelName, FabricConfig fabricConfig) throws Exception {
+    public FabricConnector(User user, FabricConfig fabricConfig) throws Exception {
+        this(user, null, fabricConfig);
+    }
+
+    public FabricConnector(String defaultChannelName, FabricConfig fabricConfig) throws Exception {
+        this(null, defaultChannelName, fabricConfig);
+    }
+
+    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig) throws Exception {
+        this.fabricConfig = fabricConfig;
+        this.defaultChannelName = defaultChannelName;
+
         hfClient = HFClient.createNewInstance();
         CryptoSuite cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
         hfClient.setCryptoSuite(cryptoSuite);
-        this.fabricConfig = fabricConfig;
-        channel = user == null ?
-                fabricConfig.getChannel(this.hfClient, channelName) :
-                fabricConfig.getChannel(hfClient, channelName, user);
+
+
+        // init default channel
+        if(defaultChannelName != null) {
+            if (user == null) {
+                fabricConfig.initChannel(hfClient, defaultChannelName);
+            } else {
+                fabricConfig.initChannel(hfClient, defaultChannelName, user);
+            }
+        }
     }
 
     public void setUserContext(User user) throws Exception {
@@ -41,10 +59,20 @@ public class FabricConnector {
     }
 
     public void deployChaincode(String chaincodeName) throws Exception {
-        fabricConfig.instantiateChaincode(hfClient, channel, new ArrayList<>(channel.getPeers()), chaincodeName);
+        deployChaincode(chaincodeName, defaultChannelName);
     }
 
     public void upgradeChaincode(String chaincodeName) throws Exception {
+        upgradeChaincode(chaincodeName, defaultChannelName);
+    }
+
+    public void deployChaincode(String chaincodeName, String channelName) throws Exception {
+        Channel channel = hfClient.getChannel(channelName);
+        fabricConfig.instantiateChaincode(hfClient, channel, new ArrayList<>(channel.getPeers()), chaincodeName);
+    }
+
+    public void upgradeChaincode(String chaincodeName, String channelName) throws Exception {
+        Channel channel = hfClient.getChannel(channelName);
         fabricConfig.upgradeChaincode(hfClient, channel, new ArrayList<>(channel.getPeers()), chaincodeName);
     }
 
@@ -59,9 +87,14 @@ public class FabricConnector {
     }
 
     public CompletableFuture<Collection<ProposalResponse>> buildProposalFuture(TransactionProposalRequest transactionProposalRequest, boolean returnOnlySuccessful) {
+        return buildProposalFuture(transactionProposalRequest, defaultChannelName, returnOnlySuccessful);
+    }
+
+    public CompletableFuture<Collection<ProposalResponse>> buildProposalFuture(TransactionProposalRequest transactionProposalRequest, String channelName, boolean returnOnlySuccessful) {
 
         return CompletableFuture.supplyAsync(() -> {
             try {
+                Channel channel = hfClient.getChannel(channelName);
                 Collection<ProposalResponse> proposalResponses = channel.sendTransactionProposal(transactionProposalRequest, channel.getPeers());
                 Collection<ProposalResponse> successful = new LinkedList<>();
 
@@ -95,11 +128,15 @@ public class FabricConnector {
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> buildTransactionFuture(TransactionProposalRequest transactionProposalRequest) {
+        return buildTransactionFuture(transactionProposalRequest, defaultChannelName);
+    }
+
+    public CompletableFuture<BlockEvent.TransactionEvent> buildTransactionFuture(TransactionProposalRequest transactionProposalRequest, String channelName) {
 
         return buildProposalFuture(transactionProposalRequest, true).thenCompose(proposalResponses -> {
             CompletableFuture<BlockEvent.TransactionEvent> future = null;
             try {
-                future = channel.sendTransaction(proposalResponses);
+                future = hfClient.getChannel(channelName).sendTransaction(proposalResponses);
             } catch (Exception e) {
                 logger.error("Failed to send transaction to channel", e);
             }
@@ -107,7 +144,6 @@ public class FabricConnector {
             return future;
         });
     }
-
 
     public QueryByChaincodeRequest buildQueryRequest(String function, String chaincode, byte[][] message) {
 
@@ -120,10 +156,14 @@ public class FabricConnector {
     }
 
     public CompletableFuture<byte[]> sendQueryRequest(QueryByChaincodeRequest request) {
+        return sendQueryRequest(request, defaultChannelName);
+    }
+
+    public CompletableFuture<byte[]> sendQueryRequest(QueryByChaincodeRequest request, String channelName) {
         return CompletableFuture.supplyAsync(() -> {
             String lastFailReason = "no responses received";
             try {
-                final Collection<ProposalResponse> proposalResponses = channel.queryByChaincode(request);
+                final Collection<ProposalResponse> proposalResponses = hfClient.getChannel(channelName).queryByChaincode(request);
                 for (ProposalResponse proposalResponse : proposalResponses) {
                     if (!proposalResponse.isVerified() || proposalResponse.getStatus() != ProposalResponse.Status.SUCCESS) {
                         lastFailReason = proposalResponse.getMessage();

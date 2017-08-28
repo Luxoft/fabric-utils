@@ -160,6 +160,14 @@ public class FabricConfig extends YamlConfig {
         return hfClient.newEventHub(eventhubName, eventhubUrl, eventhubProperties);
     }
 
+    public void initChannel(HFClient hfClient, String channelName) throws Exception {
+        getChannel(hfClient, channelName);
+    }
+
+    public void initChannel(HFClient hfClient, String channelName, User fabricUser) throws Exception {
+        getChannel(hfClient, channelName, fabricUser);
+    }
+
     public Channel getChannel(HFClient hfClient, String channelName) throws Exception {
         JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
         String adminKey = channelParameters.get("admin").asText();
