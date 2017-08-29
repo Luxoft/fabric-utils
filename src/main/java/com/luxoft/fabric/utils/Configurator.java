@@ -91,9 +91,8 @@ public class Configurator {
                     eventhubList.add(eventhub);
                 }
 
-                ChannelConfiguration channelConfiguration = new ConfigGenerator().generateChannelConfiguration(channelName);
-                byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, fabricUser);
-                Channel channel = hfClient.newChannel(channelName, orderer, channelConfiguration, channelConfigurationSignature);
+                Channel channel = fabricConfig.createChannel(hfClient, channelName, fabricUser, orderer);
+
                 for (Peer peer : peerList) {
                     channel.joinPeer(peer);
                 }

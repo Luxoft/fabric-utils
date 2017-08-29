@@ -2,6 +2,7 @@ package com.luxoft.fabric;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.YamlConfig;
+import com.luxoft.fabric.utils.ConfigGenerator;
 import org.apache.commons.io.IOUtils;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.openssl.PEMParser;
@@ -33,6 +34,7 @@ import static java.util.Objects.requireNonNull;
 public class FabricConfig extends YamlConfig {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
+    private final ConfigGenerator configGenerator = new ConfigGenerator();
 
     static {
         //loading Fabric security provider to the system
@@ -158,6 +160,12 @@ public class FabricConfig extends YamlConfig {
         }
 
         return hfClient.newEventHub(eventhubName, eventhubUrl, eventhubProperties);
+    }
+
+    public Channel createChannel(HFClient hfClient, String channelName, User fabricUser, Orderer orderer) throws Exception {
+        ChannelConfiguration channelConfiguration = configGenerator.generateChannelConfiguration(channelName);
+        byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, fabricUser);
+        return hfClient.newChannel(channelName, orderer, channelConfiguration, channelConfigurationSignature);
     }
 
     public void initChannel(HFClient hfClient, String channelName) throws Exception {
