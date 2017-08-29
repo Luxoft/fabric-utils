@@ -4,17 +4,21 @@ import org.hyperledger.fabric.sdk.ChannelConfiguration;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
 public class ConfigGenerator {
 
 
-    public final String BASE_DIR = "network";
+    private final String BASE_DIR = "network";
 
 
     public ChannelConfiguration generateChannelConfiguration(String channel) throws Exception {
+        return generateChannelConfiguration(channel, null, null);
+    }
 
-        generateChannelArtifacts(channel);
+    public ChannelConfiguration generateChannelConfiguration(String channel, String channelProfile, String genesisProfile) throws Exception {
+        generateChannelArtifacts(channel, channelProfile, genesisProfile);
 
         File txFile = new File(BASE_DIR,"/channel-artifacts/" + channel + "/channel.tx");
 
@@ -24,16 +28,28 @@ public class ConfigGenerator {
     }
 
     public void generateCryptoConfig(String channel) throws Exception {
-        callScript(BASE_DIR, "./generateCerts.sh", "-c", channel);
+        ArrayList<String> command = new ArrayList<>();
+        command.add("./generateCerts.sh");
+
+        if(channel != null)        { command.add("-c"); command.add(channel); }
+
+        callScript(command, BASE_DIR);
     }
 
 
-    public void generateChannelArtifacts(String channel) throws Exception {
-        callScript(BASE_DIR, "./generateChannelArtifacts.sh", "-c", channel);
+    public void generateChannelArtifacts(String channel, String channelProfile, String genesisProfile) throws Exception {
+        ArrayList<String> command = new ArrayList<>();
+        command.add("./generateChannelArtifacts.sh");
+
+        if(channel != null) { command.add("-c"); command.add(channel); }
+        if(channelProfile != null) { command.add("-p"); command.add(channelProfile); }
+        if(genesisProfile != null) { command.add("-g"); command.add(genesisProfile); }
+
+        callScript(command, BASE_DIR);
     }
 
 
-    private void callScript( String dir, String... commandAndArgs) throws Exception {
+    private void callScript(ArrayList<String> commandAndArgs, String dir) throws Exception {
         ProcessBuilder pb = new ProcessBuilder(commandAndArgs);
         if (dir != null) pb.directory(new File(dir));
         pb.inheritIO();

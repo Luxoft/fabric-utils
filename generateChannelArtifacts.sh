@@ -32,7 +32,7 @@ function generateChannelArtifacts() {
   echo "##########################################################"
   # Note: For some unknown reason (at least for now) the block file can't be
   # named orderer.genesis.block or the orderer will fail to launch!
-  configtxgen -profile OneOrgOrdererGenesis -outputBlock ./channel-artifacts/$CHANNEL_NAME/genesis.block
+  configtxgen -profile ${GENESIS_PROFILE} -outputBlock ./channel-artifacts/${CHANNEL_NAME}/genesis.block
   if [ "$?" -ne 0 ]; then
     echo "Failed to generate orderer genesis block..."
     exit 1
@@ -41,7 +41,7 @@ function generateChannelArtifacts() {
   echo "#################################################################"
   echo "### Generating channel configuration transaction 'channel.tx' ###"
   echo "#################################################################"
-  configtxgen -profile OneOrgChannel -outputCreateChannelTx ./channel-artifacts/${CHANNEL_NAME}/channel.tx -channelID $CHANNEL_NAME
+  configtxgen -profile ${CHANNEL_PROFILE} -outputCreateChannelTx ./channel-artifacts/${CHANNEL_NAME}/channel.tx -channelID $CHANNEL_NAME
   if [ "$?" -ne 0 ]; then
     echo "Failed to generate channel configuration transaction..."
     exit 1
@@ -51,7 +51,7 @@ function generateChannelArtifacts() {
   echo "#################################################################"
   echo "#######    Generating anchor peer update for Org1MSP   ##########"
   echo "#################################################################"
-  configtxgen -profile OneOrgChannel -outputAnchorPeersUpdate ./channel-artifacts/${CHANNEL_NAME}/Org1MSPanchors.tx -channelID $CHANNEL_NAME -asOrg Org1MSP
+  configtxgen -profile ${CHANNEL_PROFILE} -outputAnchorPeersUpdate ./channel-artifacts/${CHANNEL_NAME}/Org1MSPanchors.tx -channelID $CHANNEL_NAME -asOrg Org1MSP
   if [ "$?" -ne 0 ]; then
     echo "Failed to generate anchor peer update for Org1MSP..."
     exit 1
@@ -72,18 +72,30 @@ function generateChannelArtifacts() {
 
 CLI_TIMEOUT=10000
 CHANNEL_NAME="demo-channel"
+CHANNEL_PROFILE="OneOrgChannel"
+GENESIS_PROFILE="OneOrgOrdererGenesis"
 
 # Parse commandline args
-while getopts "m:c:" opt; do
-  case "$opt" in
-    c)  CHANNEL_NAME=$OPTARG
-    ;;
+while [[ $# -gt 1 ]]
+do
+  key="$1"
+  case ${key} in
+    -c|--channel-name)     CHANNEL_NAME="$2"
+        shift
+        ;;
+    -p|--channel-profile)  CHANNEL_PROFILE="$2"
+        shift
+        ;;
+    -g|--genesis-profile)  GENESIS_PROFILE="$2"
+        shift
+        ;;
   esac
+  shift
 done
 
 mkdir -p "channel-artifacts/${CHANNEL_NAME}"
 
-echo "Generating artifacts for channel '${CHANNEL_NAME}'"
+echo "Generating artifacts for channel '${CHANNEL_NAME}', profile '${CHANNEL_PROFILE}', genesis '${GENESIS_PROFILE}'"
 #askProceed
 
 
