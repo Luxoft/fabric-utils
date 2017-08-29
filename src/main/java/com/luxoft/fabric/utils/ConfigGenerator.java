@@ -10,8 +10,15 @@ import java.util.concurrent.TimeUnit;
 public class ConfigGenerator {
 
 
-    private final String BASE_DIR = "network";
+    private String baseDir = "network";
 
+
+    public ConfigGenerator() {
+    }
+
+    public ConfigGenerator(String baseDir) {
+        this.baseDir = baseDir;
+    }
 
     public ChannelConfiguration generateChannelConfiguration(String channel) throws Exception {
         return generateChannelConfiguration(channel, null, null);
@@ -20,7 +27,7 @@ public class ConfigGenerator {
     public ChannelConfiguration generateChannelConfiguration(String channel, String channelProfile, String genesisProfile) throws Exception {
         generateChannelArtifacts(channel, channelProfile, genesisProfile);
 
-        File txFile = new File(BASE_DIR,"/channel-artifacts/" + channel + "/channel.tx");
+        File txFile = new File(baseDir,"/channel-artifacts/" + channel + "/channel.tx");
 
         if(!txFile.exists()) throw new IOException("Tx file not generated");
 
@@ -33,7 +40,7 @@ public class ConfigGenerator {
 
         if(channel != null)        { command.add("-c"); command.add(channel); }
 
-        callScript(command, BASE_DIR);
+        callScript(command, baseDir);
     }
 
 
@@ -45,7 +52,7 @@ public class ConfigGenerator {
         if(channelProfile != null) { command.add("-p"); command.add(channelProfile); }
         if(genesisProfile != null) { command.add("-g"); command.add(genesisProfile); }
 
-        callScript(command, BASE_DIR);
+        callScript(command, baseDir);
     }
 
 
@@ -57,5 +64,14 @@ public class ConfigGenerator {
         p.waitFor(10, TimeUnit.SECONDS);
         int exitValue = p.exitValue();
         if(exitValue != 0) throw new IllegalStateException("Process exited with non-zero error code: " + exitValue);
+    }
+
+
+    public String getBaseDir() {
+        return baseDir;
+    }
+
+    public void setBaseDir(String baseDir) {
+        this.baseDir = baseDir;
     }
 }
