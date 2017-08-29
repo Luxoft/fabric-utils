@@ -91,8 +91,7 @@ public class Configurator {
                     eventhubList.add(eventhub);
                 }
 
-                String txFile = channelParameters.get("txFile").asText();
-                ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
+                ChannelConfiguration channelConfiguration = new ConfigGenerator().generateChannelConfiguration(channelName);
                 byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, fabricUser);
                 Channel channel = hfClient.newChannel(channelName, orderer, channelConfiguration, channelConfigurationSignature);
                 for (Peer peer : peerList) {
