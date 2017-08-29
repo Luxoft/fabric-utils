@@ -36,7 +36,7 @@ public class ConfigGenerator {
 
     public void generateCryptoConfig(String channel) throws Exception {
         ArrayList<String> command = new ArrayList<>();
-        command.add("./generateCerts.sh");
+        command.add("./generateCryptoConfig.sh");
 
         if(channel != null)        { command.add("-c"); command.add(channel); }
 
