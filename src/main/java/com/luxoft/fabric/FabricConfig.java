@@ -24,6 +24,7 @@ import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
@@ -221,7 +222,8 @@ public class FabricConfig extends YamlConfig {
         return channel;
     }
 
-    public void instantiateChaincode(HFClient hfClient, Channel channel, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException {
+
+    public void installChaincode(HFClient hfClient, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException {
         JsonNode chaincodeParameters = getChaincodeDetails(key);
 
         String chaincodeIDString = chaincodeParameters.get("id").asText();
@@ -230,12 +232,10 @@ public class FabricConfig extends YamlConfig {
         String chaincodePathPrefix = chaincodeParameters.path("sourceLocationPrefix").asText("chaincode");
         String chaincodeVersion = chaincodeParameters.path("version").asText("0");
         String chaincodeType = chaincodeParameters.path("type").asText("GO_LANG");
-        String endorsementPolicy = chaincodeParameters.path("endorsementPolicy").asText("");
-        List<String> chaincodeInitArguments = new ArrayList<>();
-        chaincodeParameters.withArray("initArguments").forEach(element -> chaincodeInitArguments.add(element.asText()));
+
+        ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
 
         InstallProposalRequest installProposalRequest = hfClient.newInstallProposalRequest();
-        ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
         installProposalRequest.setChaincodeID(chaincodeID);
         installProposalRequest.setChaincodeSourceLocation(new File(chaincodePathPrefix));
         installProposalRequest.setChaincodeVersion(chaincodeVersion);
@@ -243,6 +243,22 @@ public class FabricConfig extends YamlConfig {
         Collection<ProposalResponse> installProposalResponse = hfClient.sendInstallProposal(installProposalRequest, peerList);
 
         checkProposalResponse("install chaincode", installProposalResponse);
+    }
+
+
+    public void instantiateChaincode(HFClient hfClient, Channel channel, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException {
+
+        JsonNode chaincodeParameters = getChaincodeDetails(key);
+
+        String chaincodeIDString = chaincodeParameters.get("id").asText();
+        String chaincodePath = chaincodeParameters.get("sourceLocation").asText();
+        String chaincodeVersion = chaincodeParameters.path("version").asText("0");
+        ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
+
+        String endorsementPolicy = chaincodeParameters.path("endorsementPolicy").asText("");
+
+        List<String> chaincodeInitArguments = new ArrayList<>();
+        chaincodeParameters.withArray("initArguments").forEach(element -> chaincodeInitArguments.add(element.asText()));
 
         InstantiateProposalRequest instantiateProposalRequest = hfClient.newInstantiationProposalRequest();
         instantiateProposalRequest.setProposalWaitTime(60000);

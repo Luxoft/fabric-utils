@@ -68,7 +68,8 @@ public class FabricConnector {
 
     public void deployChaincode(String chaincodeName, String channelName) throws Exception {
         Channel channel = hfClient.getChannel(channelName);
-        fabricConfig.instantiateChaincode(hfClient, channel, new ArrayList<>(channel.getPeers()), chaincodeName);
+        fabricConfig.installChaincode(hfClient, new ArrayList<>(channel.getPeers()), chaincodeName);
+        fabricConfig.instantiateChaincode(hfClient, channel, chaincodeName);
     }
 
     public void upgradeChaincode(String chaincodeName, String channelName) throws Exception {

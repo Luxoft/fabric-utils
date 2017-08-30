@@ -6,6 +6,8 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
 import org.hyperledger.fabric.sdk.*;
+import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
+import org.hyperledger.fabric.sdk.exception.ProposalException;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,6 +59,7 @@ public class Configurator {
             throw new RuntimeException("Need at least one channel to do some work");
 
         CryptoSuite cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
+        Set<String> installedChaincodes = new HashSet<>();
 
         while (channels.hasNext()) {
             Map.Entry<String, JsonNode> channelObject = channels.next().fields().next();
@@ -103,7 +106,10 @@ public class Configurator {
 
                 for (JsonNode jsonNode : channelParameters.get("chaincodes")) {
                     String chaincodeKey = jsonNode.asText();
-                    fabricConfig.instantiateChaincode(hfClient, channel, peerList, chaincodeKey);
+
+                    installChaincodes(hfClient, fabricConfig, installedChaincodes, peerList, chaincodeKey);
+
+                    fabricConfig.instantiateChaincode(hfClient, channel, chaincodeKey);
                 }
             } catch (Exception e) {
                logger.error("Failed to process channel:" + channelName, e);
@@ -113,6 +119,7 @@ public class Configurator {
 
     private void deployChancodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {
 
+        Set<String> installedChaincodes = new HashSet<>();
         Iterator<JsonNode> channels = fabricConfig.getChannels();
         while(channels.hasNext()) {
             Map.Entry<String, JsonNode> channelObject = channels.next().fields().next();
@@ -134,7 +141,11 @@ public class Configurator {
                 Channel channel = hfc.getChannel(channelName);
                 List<Peer> peers = new ArrayList<>(channel.getPeers());
 
-                fabricConfig.instantiateChaincode(hfc, channel, peers, chaincodeName);
+                String chaincodeKey = jsonNode.asText();
+
+                installChaincodes(hfc, fabricConfig, installedChaincodes, peers, chaincodeKey);
+
+                fabricConfig.instantiateChaincode(hfc, channel, chaincodeKey);
             }
         }
     }
@@ -163,6 +174,17 @@ public class Configurator {
                 List<Peer> peers = new ArrayList<>(channel.getPeers());
 
                 fabricConfig.upgradeChaincode(hfc, channel, peers, chaincodeName);
+            }
+        }
+    }
+
+
+    private void installChaincodes(HFClient hfc, FabricConfig fabricConfig, Set<String> installedChaincodes, List<Peer> peers, String chaincodeKey) throws InvalidArgumentException, ProposalException {
+        for (Peer peer: peers) {
+            String chaincodeInstallKey = chaincodeKey + "@" + peer.getName();
+            if (!installedChaincodes.contains(chaincodeInstallKey)) {
+                fabricConfig.installChaincode(hfc, Collections.singletonList(peer), chaincodeKey);
+                installedChaincodes.add(chaincodeInstallKey);
             }
         }
     }
