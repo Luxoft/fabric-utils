@@ -68,12 +68,14 @@ public class FabricConnector {
 
     public void deployChaincode(String chaincodeName, String channelName) throws Exception {
         Channel channel = hfClient.getChannel(channelName);
+        if(channel == null) throw new IllegalAccessException("Channel not found for name:" + channelName);
         fabricConfig.installChaincode(hfClient, new ArrayList<>(channel.getPeers()), chaincodeName);
         fabricConfig.instantiateChaincode(hfClient, channel, chaincodeName);
     }
 
     public void upgradeChaincode(String chaincodeName, String channelName) throws Exception {
         Channel channel = hfClient.getChannel(channelName);
+        if(channel == null) throw new IllegalAccessException("Channel not found for name:" + channelName);
         fabricConfig.upgradeChaincode(hfClient, channel, new ArrayList<>(channel.getPeers()), chaincodeName);
     }
 
@@ -96,6 +98,7 @@ public class FabricConnector {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 Channel channel = hfClient.getChannel(channelName);
+                if(channel == null) throw new IllegalAccessException("Channel not found for name:" + channelName);
                 Collection<ProposalResponse> proposalResponses = channel.sendTransactionProposal(transactionProposalRequest, channel.getPeers());
                 Collection<ProposalResponse> successful = new LinkedList<>();
 
@@ -137,7 +140,9 @@ public class FabricConnector {
         return buildProposalFuture(transactionProposalRequest, true).thenCompose(proposalResponses -> {
             CompletableFuture<BlockEvent.TransactionEvent> future = null;
             try {
-                future = hfClient.getChannel(channelName).sendTransaction(proposalResponses);
+                Channel channel = hfClient.getChannel(channelName);
+                if(channel == null) throw new IllegalAccessException("Channel not found for name:" + channelName);
+                future = channel.sendTransaction(proposalResponses);
             } catch (Exception e) {
                 logger.error("Failed to send transaction to channel", e);
             }
@@ -164,7 +169,9 @@ public class FabricConnector {
         return CompletableFuture.supplyAsync(() -> {
             String lastFailReason = "no responses received";
             try {
-                final Collection<ProposalResponse> proposalResponses = hfClient.getChannel(channelName).queryByChaincode(request);
+                Channel channel = hfClient.getChannel(channelName);
+                if(channel == null) throw new IllegalAccessException("Channel not found for name:" + channelName);
+                final Collection<ProposalResponse> proposalResponses = channel.queryByChaincode(request);
                 for (ProposalResponse proposalResponse : proposalResponses) {
                     if (!proposalResponse.isVerified() || proposalResponse.getStatus() != ProposalResponse.Status.SUCCESS) {
                         lastFailReason = proposalResponse.getMessage();
