@@ -180,10 +180,18 @@ public class FabricConnector {
     }
 
     public CompletableFuture<byte[]> query(String function, String chaincode, byte[]... message) {
-        return sendQueryRequest(buildQueryRequest(function, chaincode, message));
+        return query(function, chaincode, defaultChannelName, message);
+    }
+
+    public CompletableFuture<byte[]> query(String function, String chaincode, String channelName, byte[]... message) {
+        return sendQueryRequest(buildQueryRequest(function, chaincode, message), channelName);
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, byte[]... message) throws Exception {
+        return invoke(function, chaincode, defaultChannelName, message);
+    }
+
+    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, byte[]... message) throws Exception {
         return buildTransactionFuture(buildProposalRequest(function, chaincode, message));
     }
 }
