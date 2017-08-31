@@ -1,14 +1,12 @@
 package com.luxoft.fabric;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -44,13 +42,10 @@ public class FabricConnector {
         hfClient.setCryptoSuite(cryptoSuite);
 
 
-        // init default channel
-        if(defaultChannelName != null) {
-            if (user == null) {
-                fabricConfig.initChannel(hfClient, defaultChannelName);
-            } else {
-                fabricConfig.initChannel(hfClient, defaultChannelName, user);
-            }
+        // init channels
+        for (Iterator<JsonNode> it = fabricConfig.getChannels(); it.hasNext(); ) {
+            String channel = it.next().fields().next().getKey();
+            fabricConfig.initChannel(hfClient, channel);
         }
     }
 
@@ -68,14 +63,14 @@ public class FabricConnector {
 
     public void deployChaincode(String chaincodeName, String channelName) throws Exception {
         Channel channel = hfClient.getChannel(channelName);
-        if(channel == null) throw new IllegalAccessException("Channel not found for name:" + channelName);
+        if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
         fabricConfig.installChaincode(hfClient, new ArrayList<>(channel.getPeers()), chaincodeName);
         fabricConfig.instantiateChaincode(hfClient, channel, chaincodeName);
     }
 
     public void upgradeChaincode(String chaincodeName, String channelName) throws Exception {
         Channel channel = hfClient.getChannel(channelName);
-        if(channel == null) throw new IllegalAccessException("Channel not found for name:" + channelName);
+        if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
         fabricConfig.upgradeChaincode(hfClient, channel, new ArrayList<>(channel.getPeers()), chaincodeName);
     }
 
@@ -98,7 +93,7 @@ public class FabricConnector {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 Channel channel = hfClient.getChannel(channelName);
-                if(channel == null) throw new IllegalAccessException("Channel not found for name:" + channelName);
+                if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
                 Collection<ProposalResponse> proposalResponses = channel.sendTransactionProposal(transactionProposalRequest, channel.getPeers());
                 Collection<ProposalResponse> successful = new LinkedList<>();
 
@@ -137,11 +132,11 @@ public class FabricConnector {
 
     public CompletableFuture<BlockEvent.TransactionEvent> buildTransactionFuture(TransactionProposalRequest transactionProposalRequest, String channelName) {
 
-        return buildProposalFuture(transactionProposalRequest, true).thenCompose(proposalResponses -> {
+        return buildProposalFuture(transactionProposalRequest, channelName, true).thenCompose(proposalResponses -> {
             CompletableFuture<BlockEvent.TransactionEvent> future = null;
             try {
                 Channel channel = hfClient.getChannel(channelName);
-                if(channel == null) throw new IllegalAccessException("Channel not found for name:" + channelName);
+                if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
                 future = channel.sendTransaction(proposalResponses);
             } catch (Exception e) {
                 logger.error("Failed to send transaction to channel", e);
@@ -170,7 +165,7 @@ public class FabricConnector {
             String lastFailReason = "no responses received";
             try {
                 Channel channel = hfClient.getChannel(channelName);
-                if(channel == null) throw new IllegalAccessException("Channel not found for name:" + channelName);
+                if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
                 final Collection<ProposalResponse> proposalResponses = channel.queryByChaincode(request);
                 for (ProposalResponse proposalResponse : proposalResponses) {
                     if (!proposalResponse.isVerified() || proposalResponse.getStatus() != ProposalResponse.Status.SUCCESS) {
@@ -199,6 +194,6 @@ public class FabricConnector {
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, byte[]... message) throws Exception {
-        return buildTransactionFuture(buildProposalRequest(function, chaincode, message));
+        return buildTransactionFuture(buildProposalRequest(function, chaincode, message), channelName);
     }
 }
