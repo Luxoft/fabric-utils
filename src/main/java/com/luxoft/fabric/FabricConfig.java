@@ -163,7 +163,7 @@ public class FabricConfig extends YamlConfig {
         return hfClient.newEventHub(eventhubName, eventhubUrl, eventhubProperties);
     }
 
-    public Channel createChannel(HFClient hfClient, String channelName, User fabricUser, Orderer orderer) throws Exception {
+    public Channel generateChannel(HFClient hfClient, String channelName, User fabricUser, Orderer orderer) throws Exception {
         ChannelConfiguration channelConfiguration = configGenerator.generateChannelConfiguration(channelName);
         byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, fabricUser);
         return hfClient.newChannel(channelName, orderer, channelConfiguration, channelConfigurationSignature);

@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit;
 public class ConfigGenerator {
 
 
-    private String baseDir = "network";
+    private String baseDir = "files/artifacts";
 
 
     public ConfigGenerator() {
@@ -27,7 +27,7 @@ public class ConfigGenerator {
     public ChannelConfiguration generateChannelConfiguration(String channel, String channelProfile, String genesisProfile) throws Exception {
         generateChannelArtifacts(channel, channelProfile, genesisProfile);
 
-        File txFile = new File(baseDir,"/channel-artifacts/" + channel + "/channel.tx");
+        File txFile = new File(baseDir,channel + "/channel.tx");
 
         if(!txFile.exists()) throw new IOException("Tx file not generated");
 
