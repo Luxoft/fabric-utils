@@ -247,6 +247,10 @@ public class FabricConfig extends YamlConfig {
 
 
     public void instantiateChaincode(HFClient hfClient, Channel channel, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException {
+        instantiateChaincode(hfClient, channel, key, null);
+    }
+
+    public void instantiateChaincode(HFClient hfClient, Channel channel, String key, Collection<Peer> peers) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException {
 
         JsonNode chaincodeParameters = getChaincodeDetails(key);
 
@@ -274,7 +278,12 @@ public class FabricConfig extends YamlConfig {
             chaincodeEndorsementPolicy.fromYamlFile(new File(endorsementPolicy));
             instantiateProposalRequest.setChaincodeEndorsementPolicy(chaincodeEndorsementPolicy);
         }
-        Collection<ProposalResponse> instantiateProposalResponses = channel.sendInstantiationProposal(instantiateProposalRequest);
+        Collection<ProposalResponse> instantiateProposalResponses;
+        if(peers != null) {
+            instantiateProposalResponses = channel.sendInstantiationProposal(instantiateProposalRequest, peers);
+        } else {
+            instantiateProposalResponses = channel.sendInstantiationProposal(instantiateProposalRequest);
+        }
 
         checkProposalResponse("instantiate chaincode", instantiateProposalResponses);
         channel.sendTransaction(instantiateProposalResponses);
