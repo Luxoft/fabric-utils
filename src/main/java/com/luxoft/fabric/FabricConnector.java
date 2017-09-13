@@ -16,8 +16,8 @@ public class FabricConnector {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    private HFClient hfClient;
-    private FabricConfig fabricConfig;
+    protected HFClient hfClient;
+    protected FabricConfig fabricConfig;
 
     private String defaultChannelName;
 
@@ -41,6 +41,7 @@ public class FabricConnector {
         CryptoSuite cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
         hfClient.setCryptoSuite(cryptoSuite);
 
+        if(user != null) hfClient.setUserContext(user);
 
         // init channels
         for (Iterator<JsonNode> it = fabricConfig.getChannels(); it.hasNext(); ) {

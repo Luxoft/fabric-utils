@@ -25,6 +25,7 @@ import java.security.PrivateKey;
 import java.security.spec.InvalidKeySpecException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
@@ -189,7 +190,7 @@ public class FabricConfig extends YamlConfig {
         requireNonNull(fabricUser);
         hfClient.setUserContext(fabricUser);
 
-        String ordererName = channelParameters.get("orderer").asText();
+        String ordererName = channelParameters.get("orderers").get(0).asText();
         Orderer orderer = getNewOrderer(hfClient, ordererName);
 
         Iterator<JsonNode> peers = channelParameters.get("peers").iterator();
@@ -246,11 +247,11 @@ public class FabricConfig extends YamlConfig {
     }
 
 
-    public void instantiateChaincode(HFClient hfClient, Channel channel, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException {
-        instantiateChaincode(hfClient, channel, key, null);
+    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException {
+        return instantiateChaincode(hfClient, channel, key, null);
     }
 
-    public void instantiateChaincode(HFClient hfClient, Channel channel, String key, Collection<Peer> peers) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException {
+    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key, Collection<Peer> peers) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException {
 
         JsonNode chaincodeParameters = getChaincodeDetails(key);
 
@@ -286,10 +287,10 @@ public class FabricConfig extends YamlConfig {
         }
 
         checkProposalResponse("instantiate chaincode", instantiateProposalResponses);
-        channel.sendTransaction(instantiateProposalResponses);
+        return channel.sendTransaction(instantiateProposalResponses);
     }
 
-    public void upgradeChaincode(HFClient hfClient, Channel channel, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException {
+    public CompletableFuture<BlockEvent.TransactionEvent> upgradeChaincode(HFClient hfClient, Channel channel, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException {
         JsonNode chaincodeParameters = getChaincodeDetails(key);
 
         List<String> chaincodeInitArguments = new ArrayList<>();
@@ -325,7 +326,7 @@ public class FabricConfig extends YamlConfig {
         Collection<ProposalResponse> upgradeProposalResponses = channel.sendUpgradeProposal(upgradeProposalRequest, peerList);
 
         checkProposalResponse("upgrade chaincode", upgradeProposalResponses);
-        channel.sendTransaction(upgradeProposalResponses);
+        return channel.sendTransaction(upgradeProposalResponses);
     }
 
 

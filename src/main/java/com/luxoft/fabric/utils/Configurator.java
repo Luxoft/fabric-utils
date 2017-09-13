@@ -73,8 +73,15 @@ public class Configurator {
                 hfClient.setCryptoSuite(cryptoSuite);
                 hfClient.setUserContext(fabricUser);
 
-                String ordererName = channelParameters.get("orderer").asText();
-                Orderer orderer = fabricConfig.getNewOrderer(hfClient, ordererName);
+                Iterator<JsonNode> orderers = channelParameters.get("orderers").iterator();
+                if (!orderers.hasNext())
+                    throw new RuntimeException("Orderers list can`t be empty");
+                List<Orderer> ordererList = new ArrayList<>();
+                while (orderers.hasNext()) {
+                    String ordererKey = orderers.next().asText();
+                    Orderer orderer = fabricConfig.getNewOrderer(hfClient, ordererKey);
+                    ordererList.add(orderer);
+                }
 
                 Iterator<JsonNode> peers = channelParameters.get("peers").iterator();
                 if (!peers.hasNext())
@@ -99,9 +106,11 @@ public class Configurator {
                 String txFile = channelParameters.get("txFile").asText();
                 ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
                 byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, hfClient.getUserContext());
-                Channel channel = hfClient.newChannel(channelName, orderer, channelConfiguration, channelConfigurationSignature);
+                Channel channel = hfClient.newChannel(channelName, ordererList.get(0), channelConfiguration, channelConfigurationSignature);
 
-
+                for (int i = 1; i < ordererList.size(); i++) {
+                    channel.addOrderer(ordererList.get(i));
+                }
                 for (Peer peer : peerList) {
                     channel.joinPeer(peer);
                 }
@@ -115,7 +124,7 @@ public class Configurator {
 
                     installChaincodes(hfClient, fabricConfig, installedChaincodes, peerList, chaincodeKey);
 
-                    fabricConfig.instantiateChaincode(hfClient, channel, chaincodeKey);
+                    fabricConfig.instantiateChaincode(hfClient, channel, chaincodeKey).get();
                 }
             } catch (Exception e) {
                logger.error("Failed to process channel:" + channelName, e);
@@ -151,7 +160,7 @@ public class Configurator {
 
                 installChaincodes(hfc, fabricConfig, installedChaincodes, peers, chaincodeKey);
 
-                fabricConfig.instantiateChaincode(hfc, channel, chaincodeKey);
+                fabricConfig.instantiateChaincode(hfc, channel, chaincodeKey).get();
             }
         }
     }
@@ -179,7 +188,7 @@ public class Configurator {
                 Channel channel = hfc.getChannel(channelName);
                 List<Peer> peers = new ArrayList<>(channel.getPeers());
 
-                fabricConfig.upgradeChaincode(hfc, channel, peers, chaincodeName);
+                fabricConfig.upgradeChaincode(hfc, channel, peers, chaincodeName).get();
             }
         }
     }
