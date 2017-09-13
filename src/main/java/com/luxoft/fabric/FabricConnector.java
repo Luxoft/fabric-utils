@@ -50,6 +50,10 @@ public class FabricConnector {
         }
     }
 
+    public HFClient getHfClient() {
+        return hfClient;
+    }
+
     public void setUserContext(User user) throws Exception {
         hfClient.setUserContext(user);
     }
@@ -147,6 +151,41 @@ public class FabricConnector {
         });
     }
 
+    public static class InvokeResult
+    {
+        final BlockEvent.TransactionEvent transactionEvent;
+        final ProposalResponse proposalResponse;
+
+        public InvokeResult(BlockEvent.TransactionEvent transactionEvent, ProposalResponse proposalResponse) {
+            this.transactionEvent = transactionEvent;
+            this.proposalResponse = proposalResponse;
+        }
+
+        public BlockEvent.TransactionEvent getTransactionEvent() {
+            return transactionEvent;
+        }
+
+        public ProposalResponse getProposalResponse() {
+            return proposalResponse;
+        }
+    }
+
+    public CompletableFuture<InvokeResult> buildTransactionFutureEx(TransactionProposalRequest transactionProposalRequest, String channelName) {
+
+        return buildProposalFuture(transactionProposalRequest, true)
+                .thenCompose(proposalResponses -> {
+            try {
+                Channel channel = hfClient.getChannel(channelName);
+                if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
+
+                return channel.sendTransaction(proposalResponses)
+                        .thenApply(transactionEvent -> new InvokeResult(transactionEvent, proposalResponses.iterator().next()));
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to send transaction to channel", e);
+            }
+        });
+    }
+
     public QueryByChaincodeRequest buildQueryRequest(String function, String chaincode, byte[][] message) {
 
         final QueryByChaincodeRequest queryByChaincodeRequest = hfClient.newQueryProposalRequest();
@@ -196,5 +235,9 @@ public class FabricConnector {
 
     public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, byte[]... message) throws Exception {
         return buildTransactionFuture(buildProposalRequest(function, chaincode, message), channelName);
+    }
+
+    public CompletableFuture<InvokeResult> invokeEx(String function, String chaincode, byte[]... message) throws Exception {
+        return buildTransactionFutureEx(buildProposalRequest(function, chaincode, message), defaultChannelName);
     }
 }

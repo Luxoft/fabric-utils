@@ -3,6 +3,8 @@ package com.luxoft.fabric;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.YamlConfig;
 import com.luxoft.fabric.utils.ConfigGenerator;
+import com.luxoft.fabric.utils.MiscUtils;
+
 import org.apache.commons.io.IOUtils;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.openssl.PEMParser;
@@ -79,13 +81,23 @@ public class FabricConfig extends YamlConfig {
         return getRoot().get("cas").findValue(key);
     }
 
+    public static String getFileName(JsonNode jsonNode, String name, String defaultValue) {
+        final String value = jsonNode.path(name).asText(defaultValue);
+        return MiscUtils.resolveFile(value, null);
+    }
+
+    public static String getFileName(JsonNode jsonNode, String name)
+    {
+        return getFileName(jsonNode, name, null);
+    }
+
     public User getAdmin(String key) throws Exception {
         JsonNode adminParameters = requireNonNull(getAdminDetails(key));
 
         String adminName = adminParameters.get("name").asText();
         String adminMspID = adminParameters.get("mspID").asText();
-        String adminCert = adminParameters.get("cert").asText();
-        String adminPrivateKey = adminParameters.get("privateKey").asText();
+        String adminCert = getFileName(adminParameters, "cert");
+        String adminPrivateKey = getFileName(adminParameters, "privateKey");
 
         Enrollment enrollment = FabricConfig.createEnrollment(new FileInputStream(adminPrivateKey), new FileInputStream(adminCert));
         return new FabricUser(adminName, null, null, enrollment, adminMspID);
@@ -96,7 +108,7 @@ public class FabricConfig extends YamlConfig {
 
         String ordererUrl = ordererParameters.get("url").asText();
 
-        String ordererPemFile = ordererParameters.path("pemFile").asText("");
+        String ordererPemFile = getFileName(ordererParameters, "pemFile");
         String ordererSSLProvider = ordererParameters.path("sslProvider").asText("openSSL");
         String ordererNegotiationType = ordererParameters.path("negotiationType").asText("TLS");
         String ordererHostnameOverride = ordererParameters.path("hostnameOverride").asText("");
@@ -122,7 +134,7 @@ public class FabricConfig extends YamlConfig {
         String peerUrl = peerParameters.get("url").asText();
 
         String peerName = peerParameters.path("name").asText(key);
-        String peerPemFile = peerParameters.path("pemFile").asText("");
+        String peerPemFile = getFileName(peerParameters, "pemFile");
         String peerSSLProvider = peerParameters.path("sslProvider").asText("openSSL");
         String peerNegotiationType = peerParameters.path("negotiationType").asText("TLS");
         String peerHostnameOverride = peerParameters.path("hostnameOverride").asText("");
@@ -146,7 +158,7 @@ public class FabricConfig extends YamlConfig {
         String eventhubUrl = eventhubParameters.get("url").asText();
 
         String eventhubName = eventhubParameters.path("name").asText(key);
-        String eventhubPemFile = eventhubParameters.path("pemFile").asText("");
+        String eventhubPemFile = getFileName(eventhubParameters, "pemFile");
         String eventhubSSLProvider = eventhubParameters.path("sslProvider").asText("openSSL");
         String eventhubNegotiationType = eventhubParameters.path("negotiationType").asText("TLS");
         String eventhubHostnameOverride = eventhubParameters.path("hostnameOverride").asText("");
@@ -230,7 +242,8 @@ public class FabricConfig extends YamlConfig {
         String chaincodeIDString = chaincodeParameters.get("id").asText();
         String chaincodePath = chaincodeParameters.get("sourceLocation").asText();
 
-        String chaincodePathPrefix = chaincodeParameters.path("sourceLocationPrefix").asText("chaincode");
+        // String chaincodePathPrefix = chaincodeParameters.path("sourceLocationPrefix").asText("chaincode");
+        String chaincodePathPrefix = getFileName(chaincodeParameters, "sourceLocationPrefix", "chaincode");
         String chaincodeVersion = chaincodeParameters.path("version").asText("0");
         String chaincodeType = chaincodeParameters.path("type").asText("GO_LANG");
 
@@ -296,7 +309,7 @@ public class FabricConfig extends YamlConfig {
         List<String> chaincodeInitArguments = new ArrayList<>();
         chaincodeParameters.withArray("initArguments").forEach(element -> chaincodeInitArguments.add(element.asText()));
 
-        String chaincodePathPrefix = chaincodeParameters.path("sourceLocationPrefix").asText("chaincode");
+        String chaincodePathPrefix = getFileName(chaincodeParameters, "sourceLocationPrefix", "chaincode");
         String chaincodeIDString = chaincodeParameters.get("id").asText();
         String chaincodePath = chaincodeParameters.get("sourceLocation").asText();
         String chaincodeVersion = chaincodeParameters.path("version").asText("0");
@@ -359,7 +372,7 @@ public class FabricConfig extends YamlConfig {
 
         String caUrl = caParameters.get("url").asText();
 
-        String caCertPem = caParameters.path("pemFile").asText("");
+        String caCertPem = getFileName(caParameters, "pemFile", "");
         String caAllowAllHostNames = caParameters.path("allowAllHostNames").asText("");
 
         if (!caCertPem.isEmpty()) {
