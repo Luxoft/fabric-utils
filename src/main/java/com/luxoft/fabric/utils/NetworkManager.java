@@ -66,7 +66,7 @@ public class NetworkManager {
 
 //                Channel channel = fabricConfig.generateChannel(hfClient, channelName, fabricUser, orderer);
 
-                String txFile = channelParameters.get("txFile").asText();
+                String txFile = fabricConfig.getFileName(channelParameters, "txFile");
                 ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
                 byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, hfClient.getUserContext());
                 Channel channel = hfClient.newChannel(channelName, ordererList.get(0), channelConfiguration, channelConfigurationSignature);

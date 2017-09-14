@@ -21,6 +21,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.net.MalformedURLException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
@@ -39,14 +41,19 @@ public class FabricConfig extends YamlConfig {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     private final ConfigGenerator configGenerator = new ConfigGenerator();
+    private final Map<String,String> fileNameEnv = new HashMap<>();
 
     static {
         //loading Fabric security provider to the system
         CryptoSuite.Factory.getCryptoSuite();
     }
 
-    public FabricConfig(Reader configReader) throws IOException {
+    public FabricConfig(Reader configReader, String confdir) throws IOException {
         super(configReader);
+        if (confdir == null)
+            confdir = ".";
+
+        fileNameEnv.put("${confdir}", confdir);
     }
 
     public Iterator<JsonNode> getChannels() {
@@ -81,12 +88,19 @@ public class FabricConfig extends YamlConfig {
         return getRoot().get("cas").findValue(key);
     }
 
-    public static String getFileName(JsonNode jsonNode, String name, String defaultValue) {
-        final String value = jsonNode.path(name).asText(defaultValue);
-        return MiscUtils.resolveFile(value, null);
+    public String getFileName(JsonNode jsonNode, String name, String defaultValue) {
+        final JsonNode node = jsonNode.get(name);
+        String value = defaultValue;
+        if (node == null) {
+            if (defaultValue == null || defaultValue.isEmpty())
+                return defaultValue;
+        }
+        else
+            value = node.asText();
+        return MiscUtils.resolveFile(value, fileNameEnv);
     }
 
-    public static String getFileName(JsonNode jsonNode, String name)
+    public String getFileName(JsonNode jsonNode, String name)
     {
         return getFileName(jsonNode, name, null);
     }
@@ -108,7 +122,7 @@ public class FabricConfig extends YamlConfig {
 
         String ordererUrl = ordererParameters.get("url").asText();
 
-        String ordererPemFile = getFileName(ordererParameters, "pemFile");
+        String ordererPemFile = getFileName(ordererParameters, "pemFile", "");
         String ordererSSLProvider = ordererParameters.path("sslProvider").asText("openSSL");
         String ordererNegotiationType = ordererParameters.path("negotiationType").asText("TLS");
         String ordererHostnameOverride = ordererParameters.path("hostnameOverride").asText("");
@@ -134,7 +148,7 @@ public class FabricConfig extends YamlConfig {
         String peerUrl = peerParameters.get("url").asText();
 
         String peerName = peerParameters.path("name").asText(key);
-        String peerPemFile = getFileName(peerParameters, "pemFile");
+        String peerPemFile = getFileName(peerParameters, "pemFile", "");
         String peerSSLProvider = peerParameters.path("sslProvider").asText("openSSL");
         String peerNegotiationType = peerParameters.path("negotiationType").asText("TLS");
         String peerHostnameOverride = peerParameters.path("hostnameOverride").asText("");
@@ -158,7 +172,7 @@ public class FabricConfig extends YamlConfig {
         String eventhubUrl = eventhubParameters.get("url").asText();
 
         String eventhubName = eventhubParameters.path("name").asText(key);
-        String eventhubPemFile = getFileName(eventhubParameters, "pemFile");
+        String eventhubPemFile = getFileName(eventhubParameters, "pemFile", "");
         String eventhubSSLProvider = eventhubParameters.path("sslProvider").asText("openSSL");
         String eventhubNegotiationType = eventhubParameters.path("negotiationType").asText("TLS");
         String eventhubHostnameOverride = eventhubParameters.path("hostnameOverride").asText("");
@@ -429,5 +443,16 @@ public class FabricConfig extends YamlConfig {
         Enrollment adminEnrollment = hfcaClient.enroll(userName, userSecret);
         User user = new FabricUser(userName, null, null, adminEnrollment, mspID);
         return user;
+    }
+
+    public static FabricConfig getConfigFromFile(String configFile) {
+
+        try {
+            final Path parent = Paths.get(configFile).getParent();
+            final String dir = parent == null ? "." : parent.toString();
+            return new FabricConfig(new FileReader(configFile), dir);
+        } catch (IOException e) {
+            throw new RuntimeException("Unable to read config file " + configFile, e);
+        }
     }
 }

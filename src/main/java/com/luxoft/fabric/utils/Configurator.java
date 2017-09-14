@@ -56,9 +56,8 @@ public class Configurator extends NetworkManager {
 
         Configurator cfg = new Configurator();
 
-        FabricConfig fabricConfig = new FabricConfig(getConfigReader(options.has(config)
-                ? options.valueOf(config) : "fabric.yaml"));
-
+        final String configFile = options.has(config) ? options.valueOf(config): "fabric.yaml";
+        FabricConfig fabricConfig = FabricConfig.getConfigFromFile(configFile);
 
         if(!options.has(type) || mode.equals(Arguments.CONFIG))
             cfg.configNetwork(fabricConfig);
