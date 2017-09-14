@@ -10,6 +10,12 @@ import java.util.concurrent.TimeUnit;
 public class ConfigGenerator {
 
 
+    /**
+     * Base dir should contain generateCryptoConfig.sh and generateChannelArtifacts.sh scripts
+     * together with configtx.yaml and crypto-config.yaml
+     *
+     * Generated artifacts will be stored here in 'crypto-config' and 'channel-artifacts' folders
+     */
     private String baseDir = "network";
 
 
