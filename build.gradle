@@ -1,6 +1,6 @@
 group 'com.luxoft'
 
-version '1.2.5'
+version '1.2.6-beta4'
 
 apply plugin: 'application'
 

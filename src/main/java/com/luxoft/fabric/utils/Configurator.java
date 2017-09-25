@@ -5,6 +5,7 @@ import com.luxoft.fabric.FabricConfig;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
+import org.hyperledger.fabric.protos.peer.Query;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
@@ -106,9 +107,29 @@ public class Configurator {
                 String txFile = channelParameters.get("txFile").asText();
                 ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
                 byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, hfClient.getUserContext());
-                Channel channel = hfClient.newChannel(channelName, ordererList.get(0), channelConfiguration, channelConfigurationSignature);
 
-                for (int i = 1; i < ordererList.size(); i++) {
+                Set<String> installedChannels = hfClient.queryChannels(peerList.get(0));
+                boolean alreadyInstalled = false;
+
+                for( String installedChannelName : installedChannels) {
+                    if (installedChannelName.equalsIgnoreCase(channelName)) alreadyInstalled = true;
+                }
+
+
+                boolean newChannel = false;
+                Channel channel;
+                if(!alreadyInstalled) {
+                    try {
+                        channel = hfClient.newChannel(channelName, ordererList.get(0), channelConfiguration, channelConfigurationSignature);
+                        newChannel = true;
+                    } catch (Exception ex) {
+                        channel = hfClient.newChannel(channelName);
+                    }
+                } else {
+                    channel = hfClient.newChannel(channelName);
+                }
+
+                for (int i = newChannel?1:0; i < ordererList.size(); i++) {
                     channel.addOrderer(ordererList.get(i));
                 }
                 for (Peer peer : peerList) {
@@ -198,7 +219,11 @@ public class Configurator {
         for (Peer peer: peers) {
             String chaincodeInstallKey = chaincodeKey + "@" + peer.getName();
             if (!installedChaincodes.contains(chaincodeInstallKey)) {
-                fabricConfig.installChaincode(hfc, Collections.singletonList(peer), chaincodeKey);
+                boolean alreadyInstalled = false;
+                for (Query.ChaincodeInfo chaincode : hfc.queryInstalledChaincodes(peer)) {
+                    if(chaincode.getName().equalsIgnoreCase(chaincodeKey)) { alreadyInstalled = true; break; }
+                }
+                if(!alreadyInstalled) fabricConfig.installChaincode(hfc, Collections.singletonList(peer), chaincodeKey);
                 installedChaincodes.add(chaincodeInstallKey);
             }
         }
