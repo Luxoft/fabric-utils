@@ -66,14 +66,33 @@ public class NetworkManager {
 
 //                Channel channel = fabricConfig.generateChannel(hfClient, channelName, fabricUser, orderer);
 
-                String txFile = fabricConfig.getFileName(channelParameters, "txFile");
-                ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
-                byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, hfClient.getUserContext());
-                Channel channel = hfClient.newChannel(channelName, ordererList.get(0), channelConfiguration, channelConfigurationSignature);
+                Set<String> installedChannels = hfClient.queryChannels(peerList.get(0));
+                boolean alreadyInstalled = false;
 
-                for (int i = 1; i < ordererList.size(); i++) {
+                for( String installedChannelName : installedChannels) {
+                    if (installedChannelName.equalsIgnoreCase(channelName)) alreadyInstalled = true;
+                }
+
+                boolean newChannel = false;
+                Channel channel;
+                if(!alreadyInstalled) {
+                    try {
+                        String txFile = fabricConfig.getFileName(channelParameters, "txFile");
+                        ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
+                        byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, hfClient.getUserContext());
+                        channel = hfClient.newChannel(channelName, ordererList.get(0), channelConfiguration, channelConfigurationSignature);
+                        newChannel = true;
+                    } catch (Exception ex) {
+                        channel = hfClient.newChannel(channelName);
+                    }
+                } else {
+                    channel = hfClient.newChannel(channelName);
+                }
+
+                for (int i = newChannel?1:0; i < ordererList.size(); i++) {
                     channel.addOrderer(ordererList.get(i));
                 }
+
                 for (Peer peer : peerList) {
                     channel.joinPeer(peer);
                 }
