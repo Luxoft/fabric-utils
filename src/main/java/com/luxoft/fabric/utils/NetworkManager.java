@@ -93,9 +93,17 @@ public class NetworkManager {
                     channel.addOrderer(ordererList.get(i));
                 }
 
-                for (Peer peer : peerList) {
-                    channel.joinPeer(peer);
+                if(newChannel) {
+                    for (Peer peer : peerList) {
+                        channel.joinPeer(peer);
+                    }
+                } else {
+                    for (Peer peer : peerList) {
+                        channel.addPeer(peer);
+                    }
                 }
+
+
                 for (EventHub eventhub : eventhubList) {
                     channel.addEventHub(eventhub);
                 }
@@ -106,7 +114,11 @@ public class NetworkManager {
 
                     installChaincodes(hfClient, fabricConfig, installedChaincodes, peerList, chaincodeKey);
 
-                    fabricConfig.instantiateChaincode(hfClient, channel, chaincodeKey).get();
+                    try {
+                        fabricConfig.instantiateChaincode(hfClient, channel, chaincodeKey).get();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
             } catch (Exception e) {
                 throw new RuntimeException("Failed to process channel:" + channelName, e);
@@ -180,8 +192,12 @@ public class NetworkManager {
         for (Peer peer: peers) {
             String chaincodeInstallKey = chaincodeKey + "@" + peer.getName();
             if (!installedChaincodes.contains(chaincodeInstallKey)) {
-                fabricConfig.installChaincode(hfc, Collections.singletonList(peer), chaincodeKey);
-                installedChaincodes.add(chaincodeInstallKey);
+                try {
+                    fabricConfig.installChaincode(hfc, Collections.singletonList(peer), chaincodeKey);
+                    installedChaincodes.add(chaincodeInstallKey);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
             }
         }
     }
