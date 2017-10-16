@@ -93,7 +93,7 @@ public class NetworkManager {
                     channel.addOrderer(ordererList.get(i));
                 }
 
-                if(newChannel) {
+                if (!alreadyInstalled) {
                     for (Peer peer : peerList) {
                         channel.joinPeer(peer);
                     }
