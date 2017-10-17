@@ -69,13 +69,13 @@ public class NetworkManager {
                 Set<String> installedChannels = hfClient.queryChannels(peerList.get(0));
                 boolean alreadyInstalled = false;
 
-                for( String installedChannelName : installedChannels) {
+                for (String installedChannelName : installedChannels) {
                     if (installedChannelName.equalsIgnoreCase(channelName)) alreadyInstalled = true;
                 }
 
                 boolean newChannel = false;
                 Channel channel;
-                if(!alreadyInstalled) {
+                if (!alreadyInstalled) {
                     try {
                         String txFile = fabricConfig.getFileName(channelParameters, "txFile");
                         ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
@@ -83,13 +83,16 @@ public class NetworkManager {
                         channel = hfClient.newChannel(channelName, ordererList.get(0), channelConfiguration, channelConfigurationSignature);
                         newChannel = true;
                     } catch (Exception ex) {
+                        //recreating orderer object as it may be consumed by try channel and will be destroyed on it`s GC
+                        Orderer newOrderer = fabricConfig.getNewOrderer(hfClient, ordererList.get(0).getName());
+                        ordererList.set(0, newOrderer);
                         channel = hfClient.newChannel(channelName);
                     }
                 } else {
                     channel = hfClient.newChannel(channelName);
                 }
 
-                for (int i = newChannel?1:0; i < ordererList.size(); i++) {
+                for (int i = newChannel ? 1 : 0; i < ordererList.size(); i++) {
                     channel.addOrderer(ordererList.get(i));
                 }
 
@@ -130,7 +133,7 @@ public class NetworkManager {
 
         Set<String> installedChaincodes = new HashSet<>();
         Iterator<JsonNode> channels = fabricConfig.getChannels();
-        while(channels.hasNext()) {
+        while (channels.hasNext()) {
             Map.Entry<String, JsonNode> channelObject = channels.next().fields().next();
 
             String channelName = channelObject.getKey();
@@ -162,7 +165,7 @@ public class NetworkManager {
     public static void upgradeChancodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {
 
         Iterator<JsonNode> channels = fabricConfig.getChannels();
-        while(channels.hasNext()) {
+        while (channels.hasNext()) {
             Map.Entry<String, JsonNode> channelObject = channels.next().fields().next();
 
             String channelName = channelObject.getKey();
@@ -189,7 +192,7 @@ public class NetworkManager {
 
 
     private static void installChaincodes(HFClient hfc, FabricConfig fabricConfig, Set<String> installedChaincodes, List<Peer> peers, String chaincodeKey) throws InvalidArgumentException, ProposalException {
-        for (Peer peer: peers) {
+        for (Peer peer : peers) {
             String chaincodeInstallKey = chaincodeKey + "@" + peer.getName();
             if (!installedChaincodes.contains(chaincodeInstallKey)) {
                 try {
