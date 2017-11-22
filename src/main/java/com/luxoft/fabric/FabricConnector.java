@@ -54,6 +54,15 @@ public class FabricConnector {
         return hfClient;
     }
 
+    public Channel getChannel(String channelName)
+    {
+        return getHfClient().getChannel(channelName);
+    }
+
+    public Channel getDefaultChannel() {
+        return getChannel(defaultChannelName);
+    }
+
     public void setUserContext(User user) throws Exception {
         hfClient.setUserContext(user);
     }
