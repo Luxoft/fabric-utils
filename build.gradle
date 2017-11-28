@@ -1,6 +1,6 @@
 group 'com.luxoft'
 
-version '1.0.1-1-beta'
+version '1.0.1-1-with_events1'
 
 apply plugin: 'application'
 
@@ -10,6 +10,9 @@ mainClassName = 'com.luxoft.fabric.Configurator'
 
 repositories {
     mavenCentral()
+    maven {
+        url "http://172.26.147.116:8081/repository/luxoft.blockchainlab/"
+    }
 }
 
 buildscript {
@@ -26,10 +29,9 @@ buildscript {
 apply plugin: 'com.github.johnrengelman.shadow'
 
 dependencies {
-    compile (project('fabric-sdk-java')) {
-        exclude group: 'io.netty', module: 'netty-tcnative-boringssl-static'
-    }
 
+//    use local version of `fabric-sdk-java`
+    compile project('fabric-sdk-java')
 //    compile(group: 'org.hyperledger.fabric-sdk-java', name: 'fabric-sdk-java', version: '1.0.1') {
 //        exclude(group: 'junit', module: 'junit')
 //    }
@@ -45,6 +47,20 @@ dependencies {
 
     testCompile group: 'junit', name: 'junit', version: '4.11'
 }
+
+// replace "io.netty:netty-tcnative-boringssl-static" with "com.luxoft:netty-tcnative-luxoft-openssl-static"
+
+configurations.all {
+    resolutionStrategy {
+        // replace a specific lib explicitly:
+        eachDependency { DependencyResolveDetails details ->
+            if (details.requested.group == 'io.netty' && details.requested.name == 'netty-tcnative-boringssl-static') {
+                details.useTarget "com.luxoft:netty-tcnative-luxoft-openssl-static:${details.requested.version}"
+            }
+        }
+    }
+}
+
 
 shadowJar {
     classifier = 'fat'

@@ -68,3 +68,5 @@ gradle-app.setting
 network
 chaincodes
 crypto-config
+build
+out
