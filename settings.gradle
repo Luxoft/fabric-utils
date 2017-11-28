@@ -1,2 +1,2 @@
 rootProject.name = 'fabric-utils'
-
+include 'fabric-sdk-java'
