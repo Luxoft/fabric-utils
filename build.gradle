@@ -1,6 +1,6 @@
 group 'com.luxoft'
 
-version '1.0.1-1-with_events1'
+version '1.0.1-luxoft_events.1'
 
 apply plugin: 'application'
 
@@ -30,11 +30,9 @@ apply plugin: 'com.github.johnrengelman.shadow'
 
 dependencies {
 
-//    use local version of `fabric-sdk-java`
-    compile project(':fabric-sdk-java')
-//    compile(group: 'org.hyperledger.fabric-sdk-java', name: 'fabric-sdk-java', version: '1.0.1') {
-//        exclude(group: 'junit', module: 'junit')
-//    }
+    compile(group: 'org.hyperledger.fabric-sdk-java', name: 'fabric-sdk-java', version: '1.0.1-luxoft_events.1') {
+        exclude(group: 'junit', module: 'junit')
+    }
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.8.9'
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.8.9'
     compile group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: '2.8.9'
@@ -81,31 +79,5 @@ publishing {
         mavenJava(MavenPublication) {
             from components.java
         }
-    }
-}
-
-
-//artifacts {
-//    archives shadowJar
-//}
-
-jar {
-//  manifest { 
-//    attributes "Main-Class": "$mainClassName"
-//  }
-
-    from {
-
-        def i = configurations.compile.findAll { 
-//            it.properties.each { println "$it.key -> $it.value" }
-            if (!it.isFile())
-                return false;
-
-            it.name.startsWith("fabric-sdk-java")
-        }
-
-        i.collect { it.isDirectory() ? it : zipTree(it) }
-
-//        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
     }
 }

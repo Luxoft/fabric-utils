@@ -1,7 +1,0 @@
-target
-*.swp
-*.swo
-*.class
-.idea/
-*.iml
-*.resources.prefs
