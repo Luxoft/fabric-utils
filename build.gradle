@@ -32,7 +32,12 @@ dependencies {
 
     compile(group: 'org.hyperledger.fabric-sdk-java', name: 'fabric-sdk-java', version: '1.0.1-luxoft_events.1') {
         exclude(group: 'junit', module: 'junit')
+        exclude(group: 'io.netty', module: 'netty-tcnative-boringssl-static')
     }
+
+    // fabric java SDK depends on 2.0.5.Final
+    compile group: 'io.netty', name: 'netty-tcnative-luxoft-openssl-static', version: '2.0.5.Final'
+
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.8.9'
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.8.9'
     compile group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: '2.8.9'
@@ -48,16 +53,16 @@ dependencies {
 
 // replace "io.netty:netty-tcnative-boringssl-static" with "com.luxoft:netty-tcnative-luxoft-openssl-static"
 
-configurations.all {
-    resolutionStrategy {
-        // replace a specific lib explicitly:
-        eachDependency { DependencyResolveDetails details ->
-            if (details.requested.group == 'io.netty' && details.requested.name == 'netty-tcnative-boringssl-static') {
-                details.useTarget "com.luxoft:netty-tcnative-luxoft-openssl-static:${details.requested.version}"
-            }
-        }
-    }
-}
+//configurations.all {
+//    resolutionStrategy {
+//        // replace a specific lib explicitly:
+//        eachDependency { DependencyResolveDetails details ->
+//            if (details.requested.group == 'io.netty' && details.requested.name == 'netty-tcnative-boringssl-static') {
+//                details.useTarget "com.luxoft:netty-tcnative-luxoft-openssl-static:${details.requested.version}"
+//            }
+//        }
+//    }
+//}
 
 
 shadowJar {
@@ -81,3 +86,9 @@ publishing {
         }
     }
 }
+
+//model {
+//    tasks.generatePomFileForMavenCentralPublication {
+//        destination = file("$buildDir/generated-pom.xml")
+//    }
+//}
