@@ -35,6 +35,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
 /**
+ * TODO too big to be good
  * Created by ADoroganov on 25.07.2017.
  */
 public class FabricConfig extends YamlConfig {

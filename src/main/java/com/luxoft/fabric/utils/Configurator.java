@@ -44,6 +44,9 @@ public class Configurator extends NetworkManager {
         public static final Arguments UPGRADE = new Arguments("upgrade");
     }
 
+    /**
+     * TODO move starters into one special place
+     */
     public static void main(String[] args) throws Exception {
 
         OptionParser parser = new OptionParser();

@@ -129,6 +129,7 @@ public class NetworkManager {
         }
     }
 
+    // todo chaincodes
     public static void deployChancodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {
 
         Set<String> installedChaincodes = new HashSet<>();

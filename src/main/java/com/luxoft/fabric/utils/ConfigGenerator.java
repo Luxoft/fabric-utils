@@ -18,7 +18,6 @@ public class ConfigGenerator {
      */
     private String baseDir = "network";
 
-
     public ConfigGenerator() {
     }
 
