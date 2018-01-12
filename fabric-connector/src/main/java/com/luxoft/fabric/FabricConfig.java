@@ -1,7 +1,6 @@
 package com.luxoft.fabric;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.luxoft.YamlConfig;
 import com.luxoft.fabric.utils.ConfigGenerator;
 import com.luxoft.fabric.utils.MiscUtils;
 

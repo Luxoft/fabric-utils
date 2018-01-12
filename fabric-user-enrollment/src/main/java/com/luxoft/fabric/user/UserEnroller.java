@@ -1,7 +1,7 @@
-package com.luxoft.fabric.utils;
+package com.luxoft.fabric.user;
 
-import com.luxoft.YamlConfig;
 import com.luxoft.fabric.FabricConfig;
+import com.luxoft.fabric.YamlConfig;
 import org.apache.commons.io.FileUtils;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemWriter;
@@ -12,10 +12,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.security.Key;
-
-/**
- * TODO move starters into one special place
- */
 
 /**
  * TODO Docs for util

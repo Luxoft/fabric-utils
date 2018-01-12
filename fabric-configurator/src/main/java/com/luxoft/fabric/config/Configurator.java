@@ -1,4 +1,4 @@
-package com.luxoft.fabric.utils;
+package com.luxoft.fabric.config;
 
 import com.luxoft.fabric.FabricConfig;
 import joptsimple.OptionParser;
@@ -74,9 +74,9 @@ public class Configurator extends NetworkManager {
                     : Collections.EMPTY_SET;
 
             if (mode.equals(Arguments.DEPLOY))
-                cfg.deployChancodes(hfClient, fabricConfig, names);
+                cfg.deployChaincodes(hfClient, fabricConfig, names);
             else if (mode.equals(Arguments.UPGRADE))
-                cfg.upgradeChancodes(hfClient, fabricConfig, names);
+                cfg.upgradeChaincodes(hfClient, fabricConfig, names);
         }
     }
 }

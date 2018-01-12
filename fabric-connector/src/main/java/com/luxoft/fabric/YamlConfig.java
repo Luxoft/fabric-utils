@@ -1,4 +1,4 @@
-package com.luxoft;
+package com.luxoft.fabric;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,7 +8,6 @@ import java.io.IOException;
 import java.io.Reader;
 
 /**
- * TODO move this file into right package (from com.luxoft)
  * Created by osesov on 04.07.17.
  */
 public class YamlConfig {
