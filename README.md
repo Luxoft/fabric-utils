@@ -15,7 +15,4 @@
 - License & Contribution 
 
 Project contains utility tools and dependencies for Hyperledger Fabric.
-
-* Build:
-
-        ./gradlew build
+        

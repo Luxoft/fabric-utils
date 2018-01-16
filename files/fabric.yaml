@@ -45,7 +45,8 @@ chaincodes:
 channels:
     - mychannel:
         admin: admin
-        orderer: orderer
+        orderers:
+            - orderer
         peers:
             - peer
         eventhubs:
