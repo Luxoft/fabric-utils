@@ -1,5 +1,5 @@
 group 'com.luxoft'
-version '1.0.1-1-beta'
+version '1.0.2-SNAPSHOT'
 
 apply plugin: 'java'
 apply plugin: 'application'
@@ -8,9 +8,9 @@ apply plugin: 'com.github.johnrengelman.shadow'
 sourceCompatibility = 1.8
 mainClassName = "com.luxoft.fabric.config.Configurator"
 
-//repositories {
-//    mavenCentral()
-//}
+repositories {
+    mavenCentral()
+}
 
 buildscript {
     repositories {
