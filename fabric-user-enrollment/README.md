@@ -1,6 +1,6 @@
 ##Fabric user enrollment
 
-Utility tool for fabric new users enrollment    
+Utility tool for new users enrollment    
 
 ###Build
     gradle shadowJar
