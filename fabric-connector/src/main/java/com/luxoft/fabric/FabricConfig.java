@@ -54,6 +54,8 @@ public class FabricConfig extends YamlConfig {
             confdir = ".";
 
         fileNameEnv.put("${confdir}", confdir);
+        fileNameEnv.put("artifacts", confdir + "/artifacts");
+        fileNameEnv.put("chaincode", confdir + "/chaincode");
     }
 
     public Iterator<JsonNode> getChannels() {
@@ -303,7 +305,7 @@ public class FabricConfig extends YamlConfig {
         instantiateProposalRequest.setTransientMap(tm);
         if (!endorsementPolicy.isEmpty()) {
             ChaincodeEndorsementPolicy chaincodeEndorsementPolicy = new ChaincodeEndorsementPolicy();
-            chaincodeEndorsementPolicy.fromYamlFile(new File(endorsementPolicy));
+            chaincodeEndorsementPolicy.fromYamlFile(new File(getConfDir(), endorsementPolicy));
             instantiateProposalRequest.setChaincodeEndorsementPolicy(chaincodeEndorsementPolicy);
         }
         Collection<ProposalResponse> instantiateProposalResponses;
@@ -454,5 +456,9 @@ public class FabricConfig extends YamlConfig {
         } catch (IOException e) {
             throw new RuntimeException("Unable to read config file " + configFile, e);
         }
+    }
+
+    public String getConfDir() {
+        return fileNameEnv.get("${confdir}");
     }
 }

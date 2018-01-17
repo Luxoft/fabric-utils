@@ -1,4 +1,4 @@
-package com.luxoft.fabric.config;
+package com.luxoft.fabric.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.FabricConfig;

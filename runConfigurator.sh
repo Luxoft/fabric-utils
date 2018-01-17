@@ -11,4 +11,4 @@ gradle shadowJar
 
 echo '### Running configurator'
 cd files
-java -jar ../build/libs/fabric-configurator-fat.jar
+java -jar ../fabric-configurator/build/libs/fabric-configurator-fat.jar

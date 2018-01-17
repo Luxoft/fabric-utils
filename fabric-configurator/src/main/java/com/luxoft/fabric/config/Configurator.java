@@ -1,6 +1,7 @@
 package com.luxoft.fabric.config;
 
 import com.luxoft.fabric.FabricConfig;
+import com.luxoft.fabric.utils.NetworkManager;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
