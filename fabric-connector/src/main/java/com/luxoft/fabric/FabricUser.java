@@ -6,7 +6,6 @@ import org.hyperledger.fabric.sdk.User;
 import java.util.Set;
 
 /**
- * TODO documented API
  * Created by osesov on 03.07.17.
  */
 public class FabricUser implements User {

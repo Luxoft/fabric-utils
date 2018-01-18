@@ -5,26 +5,17 @@ import com.luxoft.fabric.utils.NetworkManager;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
-import org.hyperledger.fabric.sdk.*;
+import org.hyperledger.fabric.sdk.HFClient;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 
-
-import java.io.*;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Created by ADoroganov on 25.07.2017.
  */
 public class Configurator extends NetworkManager {
-
-    public static Reader getConfigReader(String configFile) {
-
-        try {
-            return new FileReader(configFile);
-        } catch (FileNotFoundException e) {
-            return null;
-        }
-    }
 
     public static final class Arguments {
 

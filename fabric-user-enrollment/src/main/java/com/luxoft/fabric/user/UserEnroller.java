@@ -14,7 +14,6 @@ import java.io.*;
 import java.security.Key;
 
 /**
- * TODO Docs for util
  * Created by ADoroganov on 11.08.2017.
  */
 public class UserEnroller {
