@@ -34,14 +34,19 @@ public class Configurator extends NetworkManager {
         public static final Arguments CONFIG  = new Arguments("config");
         public static final Arguments DEPLOY  = new Arguments("deploy");
         public static final Arguments UPGRADE = new Arguments("upgrade");
+        public static final Arguments ENROLL  = new Arguments("enroll");
     }
 
     public static void main(String[] args) throws Exception {
 
         OptionParser parser = new OptionParser();
         OptionSpec<Arguments> type = parser.accepts("type").withRequiredArg().ofType(Arguments.class);
+
         OptionSpec<String> name   = parser.accepts("name").withOptionalArg().ofType(String.class);
         OptionSpec<String> config = parser.accepts("config").withOptionalArg().ofType(String.class);
+
+        OptionSpec<String> caKey = parser.accepts("ca_key").withOptionalArg().ofType(String.class);
+        OptionSpec<String> userAffiliation = parser.accepts("user_affiliation").withOptionalArg().ofType(String.class);
 
         OptionSet options = parser.parse(args);
         Arguments mode = options.valueOf(type);
@@ -51,9 +56,15 @@ public class Configurator extends NetworkManager {
         final String configFile = options.has(config) ? options.valueOf(config): "fabric.yaml";
         FabricConfig fabricConfig = FabricConfig.getConfigFromFile(configFile);
 
-        if(!options.has(type) || mode.equals(Arguments.CONFIG))
+        if(!options.has(type) || mode.equals(Arguments.CONFIG)) {
             cfg.configNetwork(fabricConfig);
-        else {
+        } else if (mode.equals(Arguments.ENROLL)) {
+
+            String caKeyValue = options.valueOf(caKey);
+            String userAffiliationValue = options.valueOf(userAffiliation);
+
+            UserEnroller.run(caKeyValue, userAffiliationValue, fabricConfig);
+        } else {
 
             HFClient hfClient = HFClient.createNewInstance();
             hfClient.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());

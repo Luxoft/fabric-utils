@@ -1,4 +1,4 @@
-package com.luxoft.fabric.user;
+package com.luxoft.fabric.config;
 
 import com.luxoft.fabric.FabricConfig;
 import com.luxoft.fabric.YamlConfig;
@@ -40,16 +40,15 @@ public class UserEnroller {
         return outputStream.toString();
     }
 
-    public static void main(String[] args) throws Exception {
-        YamlConfig config = new YamlConfig(null);
-        FabricConfig fabricConfig = FabricConfig.getConfigFromFile("fabric.yaml");
+    public static void run(String caKey, String userAffiliation, FabricConfig fabricConfig) throws Exception {
+        if (caKey == null) {
+            throw new RuntimeException("ca_key should be provided");
+        }
+        if (userAffiliation == null) {
+            throw new RuntimeException("user_affiliation should be provided");
+        }
 
-        String caKey = config.getValue(String.class, "ca_key", null);
-        if (caKey == null)
-            throw new RuntimeException("ca_key environment should be provided");
-        String userAffiliation = config.getValue(String.class, "user_affiliation", null);
-        if (userAffiliation == null)
-            throw new RuntimeException("user_affiliation environment should be provided");
+        YamlConfig config = new YamlConfig(null);
 
         String userFilePath = config.getValue(String.class, "user_file_path", "users.txt");
         String destFilesRootPath = config.getValue(String.class, "dest_file_path", "users/");

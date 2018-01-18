@@ -15,21 +15,21 @@ To work with already configured channel you will need to provide following data
 - eventhubs – list of event hubs
     - key-name – key value that can be used for referring eventhubs in this config file
         - url – url for access
-        - pemFile – TLS certificate of the relevant eventshub
+        - pemFile – certificate of CA that was issuing eventhub's certificate
         - sslProvider – ssl provider to use, openSSL or JDK
         - negotationType – encryption protocol to use, TLS or plainText
         - hostnameOverride – host name that eventshub's  cert should correspond to
 - peers – list of peers
     - key-name – key value that can be used for referring peer in this config file
         - url – url for access
-        - pemFile – TLS certificate of the relevant peer
+        - pemFile – certificate of CA that was issuing peer's certificate
         - sslProvider – ssl provider to use, openSSL or JDK
         - negotationType – encryption protocol to use, TLS or plainText
         - hostnameOverride – host name that peer cert should correspond to
 - orderers – list of orderers
     - key-name – key value that can be used for referring orderer in this config file
         - url – url for access
-        - pemFile – TLS certificate of the relevant orderer
+        - pemFile – certificate of CA that was issuing orderer's certificate
         - sslProvider – ssl provider to use, openSSL or JDK
         - negotationType – encryption protocol to use, TLS or plainText
         - hostnameOverride – host name that peer cert should correspond to

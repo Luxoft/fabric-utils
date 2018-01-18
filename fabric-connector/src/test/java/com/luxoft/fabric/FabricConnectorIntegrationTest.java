@@ -9,12 +9,9 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
 import java.nio.charset.Charset;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Integration tests for Fabric connector
@@ -30,9 +27,7 @@ public class FabricConnectorIntegrationTest {
         int exitCode = execInDirectory("./fabric.sh restart", "../files/artifacts/");
         Assert.assertEquals(0, exitCode);
 
-        fabricConfig = new FabricConfig(
-                new FileReader("../files/fabric.yaml"),
-                "../files");
+        fabricConfig = FabricConfig.getConfigFromFile("../files/fabric.yaml");
 
         // Configuring Fabric network
         NetworkManager.configNetwork(fabricConfig);

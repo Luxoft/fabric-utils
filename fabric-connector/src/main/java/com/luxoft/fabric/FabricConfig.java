@@ -40,21 +40,16 @@ public class FabricConfig extends YamlConfig {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     private final ConfigGenerator configGenerator = new ConfigGenerator();
-    private final Map<String,String> fileNameEnv = new HashMap<>();
+    private final String confDir;
 
     static {
         //loading Fabric security provider to the system
         CryptoSuite.Factory.getCryptoSuite();
     }
 
-    public FabricConfig(Reader configReader, String confdir) throws IOException {
+    public FabricConfig(Reader configReader, String confDir) throws IOException {
         super(configReader);
-        if (confdir == null)
-            confdir = ".";
-
-        fileNameEnv.put("${confdir}", confdir);
-        fileNameEnv.put("artifacts", confdir + "/artifacts");
-        fileNameEnv.put("chaincode", confdir + "/chaincode");
+        this.confDir = confDir == null ? "." : confDir;
     }
 
     public Iterator<JsonNode> getChannels() {
@@ -98,7 +93,7 @@ public class FabricConfig extends YamlConfig {
         }
         else
             value = node.asText();
-        return MiscUtils.resolveFile(value, fileNameEnv);
+        return MiscUtils.resolveFile(value, confDir);
     }
 
     public String getFileName(JsonNode jsonNode, String name)
@@ -288,8 +283,6 @@ public class FabricConfig extends YamlConfig {
         String chaincodeVersion = chaincodeParameters.path("version").asText("0");
         ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
 
-        String endorsementPolicy = chaincodeParameters.path("endorsementPolicy").asText("");
-
         List<String> chaincodeInitArguments = new ArrayList<>();
         chaincodeParameters.withArray("initArguments").forEach(element -> chaincodeInitArguments.add(element.asText()));
 
@@ -302,9 +295,11 @@ public class FabricConfig extends YamlConfig {
         tm.put("HyperLedgerFabric", "InstantiateProposalRequest:JavaSDK".getBytes(UTF_8));
         tm.put("method", "InstantiateProposalRequest".getBytes(UTF_8));
         instantiateProposalRequest.setTransientMap(tm);
+
+        String endorsementPolicy = getFileName(chaincodeParameters, "endorsementPolicy", "");
         if (!endorsementPolicy.isEmpty()) {
             ChaincodeEndorsementPolicy chaincodeEndorsementPolicy = new ChaincodeEndorsementPolicy();
-            chaincodeEndorsementPolicy.fromYamlFile(new File(getConfDir(), endorsementPolicy));
+            chaincodeEndorsementPolicy.fromYamlFile(new File(endorsementPolicy));
             instantiateProposalRequest.setChaincodeEndorsementPolicy(chaincodeEndorsementPolicy);
         }
         Collection<ProposalResponse> instantiateProposalResponses;
@@ -455,9 +450,5 @@ public class FabricConfig extends YamlConfig {
         } catch (IOException e) {
             throw new RuntimeException("Unable to read config file " + configFile, e);
         }
-    }
-
-    public String getConfDir() {
-        return fileNameEnv.get("${confdir}");
     }
 }
