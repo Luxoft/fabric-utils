@@ -1,5 +1,4 @@
 rootProject.name = 'fabric-utils'
-include 'fabric-user-enrollment'
 include 'fabric-connector'
 include 'fabric-configurator'
 
