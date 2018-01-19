@@ -15,21 +15,21 @@ To work with already configured channel you will need to provide following data
 - eventhubs – list of event hubs
     - key-name – key value that can be used for referring eventhubs in this config file
         - url – url for access
-        - pemFile – certificate of CA that was issuing eventhub's certificate
+        - pemFile – file location for x509 pem certificate for SSL
         - sslProvider – ssl provider to use, openSSL or JDK
         - negotationType – encryption protocol to use, TLS or plainText
         - hostnameOverride – host name that eventshub's  cert should correspond to
 - peers – list of peers
     - key-name – key value that can be used for referring peer in this config file
         - url – url for access
-        - pemFile – certificate of CA that was issuing peer's certificate
+        - pemFile – file location for x509 pem certificate for SSL
         - sslProvider – ssl provider to use, openSSL or JDK
         - negotationType – encryption protocol to use, TLS or plainText
         - hostnameOverride – host name that peer cert should correspond to
 - orderers – list of orderers
     - key-name – key value that can be used for referring orderer in this config file
         - url – url for access
-        - pemFile – certificate of CA that was issuing orderer's certificate
+        - pemFile – file location for x509 pem certificate for SSL
         - sslProvider – ssl provider to use, openSSL or JDK
         - negotationType – encryption protocol to use, TLS or plainText
         - hostnameOverride – host name that peer cert should correspond to
@@ -43,14 +43,14 @@ To work with already configured channel you will need to provide following data
 - cas – list of CAs
     - key-name – key value that can be used for referring CA in application
         - url – url for access
-        - pemFile – TLS certificate of the relevant CA
+        - pemFile – file location for x509 pem certificate for SSL
         - allowAllHostNames – true/false, override certificates CN Host matching
         - adminLogin – login of CA admin user
         - adminSecret – secret of CA admin user
         - mspID – MSP identifier of organisation
 
 ###Configurator
-To configure network from scratch you will need to provide Network client data in addition to following:
+These fields are used to configure and update network config via fabric-configurator or NetworkManager's API:
 - chaincodes – list of chaincodes
     - key-name – key value that can be used for referring chaincode in this config file
         - id – id of chaincode to be referenced by application
@@ -63,4 +63,8 @@ To configure network from scratch you will need to provide Network client data i
     - key-name – key value that can be used for referring channel in application
         - txFile – transaction file used for channel creation
         - chaincodes – list of chaincode key-names that should be deployed to this channel
+- users – list of users to enroll
+    - key-name – key value that can be used for referring CA in which enroll users
+        - userAffiliation – affiliation for users
+        - list – user names
         

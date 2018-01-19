@@ -46,7 +46,6 @@ public class Configurator extends NetworkManager {
         OptionSpec<String> config = parser.accepts("config").withOptionalArg().ofType(String.class);
 
         OptionSpec<String> caKey = parser.accepts("ca_key").withOptionalArg().ofType(String.class);
-        OptionSpec<String> userAffiliation = parser.accepts("user_affiliation").withOptionalArg().ofType(String.class);
 
         OptionSet options = parser.parse(args);
         Arguments mode = options.valueOf(type);
@@ -61,9 +60,8 @@ public class Configurator extends NetworkManager {
         } else if (mode.equals(Arguments.ENROLL)) {
 
             String caKeyValue = options.valueOf(caKey);
-            String userAffiliationValue = options.valueOf(userAffiliation);
 
-            UserEnroller.run(caKeyValue, userAffiliationValue, fabricConfig);
+            UserEnroller.run(fabricConfig, caKeyValue);
         } else {
 
             HFClient hfClient = HFClient.createNewInstance();

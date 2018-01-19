@@ -1,5 +1,6 @@
 package com.luxoft.fabric.config;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.FabricConfig;
 import com.luxoft.fabric.YamlConfig;
 import org.apache.commons.io.FileUtils;
@@ -40,13 +41,16 @@ public class UserEnroller {
         return outputStream.toString();
     }
 
-    public static void run(String caKey, String userAffiliation, FabricConfig fabricConfig) throws Exception {
+    public static void run(FabricConfig fabricConfig, String caKey) throws Exception {
         if (caKey == null) {
             throw new RuntimeException("ca_key should be provided");
         }
-        if (userAffiliation == null) {
-            throw new RuntimeException("user_affiliation should be provided");
+        JsonNode usersDetails = fabricConfig.getUsersDetails(caKey);
+        if (usersDetails == null) {
+            throw new RuntimeException("User details not found for CA: " + caKey);
         }
+
+        String userAffiliation = usersDetails.get("userAffiliation").asText();
 
         YamlConfig config = new YamlConfig(null);
 
@@ -54,15 +58,16 @@ public class UserEnroller {
         String destFilesRootPath = config.getValue(String.class, "dest_file_path", "users/");
         String certFileName = config.getValue(String.class, "cert_file_name", "cert.pem");
         String privateKeyFileName = config.getValue(String.class, "pk_file_name", "pk.pem");
+
         logger.info("Enrolling users at CA {}", caKey);
         logger.info("Reading users from ({}), with affiliation ({}) and storing at ({}%%username%%) with cert in ({}) and pk in ({})",
                 userFilePath, userAffiliation, destFilesRootPath, certFileName, privateKeyFileName);
 
-        BufferedReader usersReader = getUsersReader(userFilePath);
-        String userName = usersReader.readLine();
         long cnt = 0;
 
-        while (userName != null) {
+        for (JsonNode userNode : usersDetails.get("list")) {
+            String userName = userNode.textValue();
+
             logger.info("Processing user " + userName);
             HFCAClient hfcaClient = fabricConfig.createHFCAClient(caKey, null);
             User admin = fabricConfig.enrollAdmin(hfcaClient, caKey);
@@ -80,7 +85,6 @@ public class UserEnroller {
             } catch (Exception e) {
                 logger.error("Failed to process user {}", userName, e);
             }
-            userName = usersReader.readLine();
         }
         logger.info("Finished, successfully processed user count: {}", cnt);
     }

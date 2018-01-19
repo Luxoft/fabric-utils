@@ -63,3 +63,10 @@ cas:
         adminLogin: admin
         adminSecret: adminpw
         mspID: Org1MSP
+
+users:
+    - ca.org1.example.com:
+        userAffiliation: org1
+        list:
+            - user1
+            - user2

@@ -10,7 +10,6 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * TODO: documented API, extract interface?
  * Created by nvolkov on 26.07.17.
  */
 public class FabricConnector {

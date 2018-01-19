@@ -84,6 +84,10 @@ public class FabricConfig extends YamlConfig {
         return getRoot().get("cas").findValue(key);
     }
 
+    public JsonNode getUsersDetails(String key) {
+        return getRoot().get("users").findValue(key);
+    }
+
     public String getFileName(JsonNode jsonNode, String name, String defaultValue) {
         final JsonNode node = jsonNode.get(name);
         String value = defaultValue;
