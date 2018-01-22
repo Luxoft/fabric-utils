@@ -49,9 +49,9 @@ public class UserEnroller {
             throw new RuntimeException("userAffiliation should be provided");
         }
 
-        String destFilesRootPath = usersDetails.get("destFilesPath").asText("users/");
-        String privateKeyFileName = usersDetails.get("privateKeyFileName").asText( "pk.pem");
-        String certFileName = usersDetails.get("certFileName").asText( "cert.pem");
+        String destFilesRootPath = usersDetails.path("destFilesPath").asText("users/");
+        String privateKeyFileName = usersDetails.path("privateKeyFileName").asText( "pk.pem");
+        String certFileName = usersDetails.path("certFileName").asText( "cert.pem");
 
         logger.info("Enrolling users at CA {}", caKey);
         logger.info("Reading users with affiliation ({}) and storing at ({}%%username%%) with cert in ({}) and pk in ({})",

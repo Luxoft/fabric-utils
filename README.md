@@ -16,24 +16,17 @@ To work with already configured channel you will need to provide following data
     - key-name – key value that can be used for referring eventhubs in this config file
         - url – url for access
         - pemFile – file location for x509 pem certificate for SSL
-        - sslProvider – ssl provider to use, openSSL or JDK
-        - negotationType – encryption protocol to use, TLS or plainText
-        - hostnameOverride – host name that eventshub's  cert should correspond to
+        - properties – list of eventhub SDK properties
 - peers – list of peers
     - key-name – key value that can be used for referring peer in this config file
         - url – url for access
         - pemFile – file location for x509 pem certificate for SSL
-        - sslProvider – ssl provider to use, openSSL or JDK
-        - negotationType – encryption protocol to use, TLS or plainText
-        - hostnameOverride – host name that peer cert should correspond to
+        - properties – list of peer SDK properties
 - orderers – list of orderers
     - key-name – key value that can be used for referring orderer in this config file
         - url – url for access
         - pemFile – file location for x509 pem certificate for SSL
-        - sslProvider – ssl provider to use, openSSL or JDK
-        - negotationType – encryption protocol to use, TLS or plainText
-        - hostnameOverride – host name that peer cert should correspond to
-        - waitTime: set request`s timeout in ms
+        - properties – list of orderer SDK properties
 - channels – list of channels
     - key-name – key value that can be used for referring channel in application
         - admin – user that will be used for working with this channel

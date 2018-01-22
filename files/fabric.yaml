@@ -9,26 +9,29 @@ eventhubs:
     - eventhub:
         url: grpcs://localhost:7053
         pemFile: artifacts/crypto-config/peerOrganizations/org1.example.com/tlsca/tlsca.org1.example.com-cert.pem
-        sslProvider: openSSL
-        negotiationType: TLS
-        hostnameOverride: peer0.org1.example.com
+        properties:
+            sslProvider: openSSL
+            negotiationType: TLS
+            hostnameOverride: peer0.org1.example.com
 
 peers:
     - peer:
         url: grpcs://localhost:7051
         pemFile: artifacts/crypto-config/peerOrganizations/org1.example.com/tlsca/tlsca.org1.example.com-cert.pem
-        sslProvider: openSSL
-        negotiationType: TLS
-        hostnameOverride: peer0.org1.example.com
+        properties:
+            sslProvider: openSSL
+            negotiationType: TLS
+            hostnameOverride: peer0.org1.example.com
 
 orderers:
     - orderer:
         url: grpcs://localhost:7050
         pemFile: artifacts/crypto-config/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem
-        sslProvider: openSSL
-        negotiationType: TLS
-        hostnameOverride: orderer.example.com
-        waitTime: 10000
+        properties:
+            sslProvider: openSSL
+            negotiationType: TLS
+            hostnameOverride: orderer.example.com
+            ordererWaitTimeMilliSecs: 10000
 
 chaincodes:
     - superchaincode:
