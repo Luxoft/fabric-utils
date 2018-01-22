@@ -65,8 +65,11 @@ cas:
         mspID: Org1MSP
 
 users:
-    - ca.org1.example.com:
-        userAffiliation: org1
-        list:
-            - user1
-            - user2
+    destFilesPath: users/
+    privateKeyFileName: pk.pem
+    certFileName: cert.pem
+    caKey: ca.org1.example.com
+    userAffiliation: org1
+    list:
+        - user1
+        - user2

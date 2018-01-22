@@ -21,14 +21,6 @@ public class UserEnroller {
 
     private static final Logger logger = LoggerFactory.getLogger(UserEnroller.class);
 
-    private static BufferedReader getUsersReader(String path) {
-        try {
-            return new BufferedReader(new FileReader(path));
-        } catch (FileNotFoundException e) {
-            return null;
-        }
-    }
-
     public static String getKeyInPemFormat(String type, Key key) throws IOException {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         PemObject pemObject = new PemObject(type, key.getEncoded());
@@ -41,27 +33,29 @@ public class UserEnroller {
         return outputStream.toString();
     }
 
-    public static void run(FabricConfig fabricConfig, String caKey) throws Exception {
-        if (caKey == null) {
-            throw new RuntimeException("ca_key should be provided");
-        }
-        JsonNode usersDetails = fabricConfig.getUsersDetails(caKey);
+    public static void run(FabricConfig fabricConfig) throws Exception {
+        JsonNode usersDetails = fabricConfig.getUsersDetails();
         if (usersDetails == null) {
-            throw new RuntimeException("User details not found for CA: " + caKey);
+            throw new RuntimeException("User details not found");
+        }
+
+        String caKey = usersDetails.get("caKey").asText();
+        if (caKey == null) {
+            throw new RuntimeException("caKey should be provided");
         }
 
         String userAffiliation = usersDetails.get("userAffiliation").asText();
+        if (userAffiliation == null) {
+            throw new RuntimeException("userAffiliation should be provided");
+        }
 
-        YamlConfig config = new YamlConfig(null);
-
-        String userFilePath = config.getValue(String.class, "user_file_path", "users.txt");
-        String destFilesRootPath = config.getValue(String.class, "dest_file_path", "users/");
-        String certFileName = config.getValue(String.class, "cert_file_name", "cert.pem");
-        String privateKeyFileName = config.getValue(String.class, "pk_file_name", "pk.pem");
+        String destFilesRootPath = usersDetails.get("destFilesPath").asText("users/");
+        String privateKeyFileName = usersDetails.get("privateKeyFileName").asText( "pk.pem");
+        String certFileName = usersDetails.get("certFileName").asText( "cert.pem");
 
         logger.info("Enrolling users at CA {}", caKey);
-        logger.info("Reading users from ({}), with affiliation ({}) and storing at ({}%%username%%) with cert in ({}) and pk in ({})",
-                userFilePath, userAffiliation, destFilesRootPath, certFileName, privateKeyFileName);
+        logger.info("Reading users with affiliation ({}) and storing at ({}%%username%%) with cert in ({}) and pk in ({})",
+                userAffiliation, destFilesRootPath, certFileName, privateKeyFileName);
 
         long cnt = 0;
 

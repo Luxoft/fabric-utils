@@ -1,6 +1,7 @@
 package com.luxoft.fabric.utils;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Iterator;
@@ -25,8 +26,18 @@ public class MiscUtils
         return file/*.getPath()*/;
     }
 
-    public static String resolveFile(String fileName, String configDir) {
-        final Path path = Paths.get(configDir, fileName);
+    public static String resolveFile(String fileName, String topDir) {
+        Path path;
+        if (Paths.get(fileName).isAbsolute()) {
+            path = Paths.get(fileName);
+        } else {
+            path = Paths.get(topDir, fileName);
+        }
+
+        if (!Files.exists(path)) {
+            throw new IllegalArgumentException("File does not exist: " + path.toUri().getPath());
+        }
+
         return path.toUri().getPath();
     }
 }
