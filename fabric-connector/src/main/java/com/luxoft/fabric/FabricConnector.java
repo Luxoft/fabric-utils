@@ -202,14 +202,14 @@ public class FabricConnector {
 
     public CompletableFuture<byte[]> sendQueryRequest(QueryByChaincodeRequest request, String channelName) {
         return CompletableFuture.supplyAsync(() -> {
-            String lastFailReason = "no responses received";
+            ProposalResponse lastFailProposal = null;
             try {
                 Channel channel = hfClient.getChannel(channelName);
                 if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
                 final Collection<ProposalResponse> proposalResponses = channel.queryByChaincode(request);
                 for (ProposalResponse proposalResponse : proposalResponses) {
                     if (!proposalResponse.isVerified() || proposalResponse.getStatus() != ProposalResponse.Status.SUCCESS) {
-                        lastFailReason = proposalResponse.getMessage();
+                        lastFailProposal = proposalResponse;
                         continue;
                     }
                     return proposalResponse.getChaincodeActionResponsePayload();
@@ -217,7 +217,12 @@ public class FabricConnector {
             } catch (Exception e) {
                 throw new RuntimeException("Unable to send query", e);
             }
-            throw new RuntimeException("Unable to send query, because: " + lastFailReason);
+            if (lastFailProposal == null) {
+                throw new RuntimeException("Unable to process query, no responses received");
+            } else {
+                throw new RuntimeException(String.format("Unable to process query, txId: %s, message: %s",
+                        lastFailProposal.getTransactionID(), lastFailProposal.getMessage()));
+            }
         });
     }
 
