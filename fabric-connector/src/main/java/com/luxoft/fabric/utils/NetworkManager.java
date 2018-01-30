@@ -129,7 +129,7 @@ public class NetworkManager {
         }
     }
 
-    public static void deployChancodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {
+    public static void deployChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {
 
         Set<String> installedChaincodes = new HashSet<>();
         Iterator<JsonNode> channels = fabricConfig.getChannels();
@@ -162,7 +162,7 @@ public class NetworkManager {
         }
     }
 
-    public static void upgradeChancodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {
+    public static void upgradeChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {
 
         Iterator<JsonNode> channels = fabricConfig.getChannels();
         while (channels.hasNext()) {

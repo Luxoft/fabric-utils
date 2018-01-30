@@ -1,29 +1,21 @@
-package com.luxoft.fabric.utils;
+package com.luxoft.fabric.config;
 
 import com.luxoft.fabric.FabricConfig;
+import com.luxoft.fabric.utils.NetworkManager;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
-import org.hyperledger.fabric.sdk.*;
+import org.hyperledger.fabric.sdk.HFClient;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 
-
-import java.io.*;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Created by ADoroganov on 25.07.2017.
  */
 public class Configurator extends NetworkManager {
-
-    public static Reader getConfigReader(String configFile) {
-
-        try {
-            return new FileReader(configFile);
-        } catch (FileNotFoundException e) {
-            return null;
-        }
-    }
 
     public static final class Arguments {
 
@@ -42,12 +34,14 @@ public class Configurator extends NetworkManager {
         public static final Arguments CONFIG  = new Arguments("config");
         public static final Arguments DEPLOY  = new Arguments("deploy");
         public static final Arguments UPGRADE = new Arguments("upgrade");
+        public static final Arguments ENROLL  = new Arguments("enroll");
     }
 
     public static void main(String[] args) throws Exception {
 
         OptionParser parser = new OptionParser();
         OptionSpec<Arguments> type = parser.accepts("type").withRequiredArg().ofType(Arguments.class);
+
         OptionSpec<String> name   = parser.accepts("name").withOptionalArg().ofType(String.class);
         OptionSpec<String> config = parser.accepts("config").withOptionalArg().ofType(String.class);
 
@@ -59,9 +53,11 @@ public class Configurator extends NetworkManager {
         final String configFile = options.has(config) ? options.valueOf(config): "fabric.yaml";
         FabricConfig fabricConfig = FabricConfig.getConfigFromFile(configFile);
 
-        if(!options.has(type) || mode.equals(Arguments.CONFIG))
+        if(!options.has(type) || mode.equals(Arguments.CONFIG)) {
             cfg.configNetwork(fabricConfig);
-        else {
+        } else if (mode.equals(Arguments.ENROLL)) {
+            UserEnroller.run(fabricConfig);
+        } else {
 
             HFClient hfClient = HFClient.createNewInstance();
             hfClient.setCryptoSuite(CryptoSuite.Factory.getCryptoSuite());
@@ -71,9 +67,9 @@ public class Configurator extends NetworkManager {
                     : Collections.EMPTY_SET;
 
             if (mode.equals(Arguments.DEPLOY))
-                cfg.deployChancodes(hfClient, fabricConfig, names);
+                cfg.deployChaincodes(hfClient, fabricConfig, names);
             else if (mode.equals(Arguments.UPGRADE))
-                cfg.upgradeChancodes(hfClient, fabricConfig, names);
+                cfg.upgradeChaincodes(hfClient, fabricConfig, names);
         }
     }
 }

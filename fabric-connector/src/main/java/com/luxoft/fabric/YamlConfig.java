@@ -1,4 +1,4 @@
-package com.luxoft;
+package com.luxoft.fabric;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

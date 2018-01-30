@@ -1,7 +1,8 @@
-package com.luxoft.fabric.utils;
+package com.luxoft.fabric.config;
 
-import com.luxoft.YamlConfig;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.FabricConfig;
+import com.luxoft.fabric.YamlConfig;
 import org.apache.commons.io.FileUtils;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemWriter;
@@ -20,14 +21,6 @@ public class UserEnroller {
 
     private static final Logger logger = LoggerFactory.getLogger(UserEnroller.class);
 
-    private static BufferedReader getUsersReader(String path) {
-        try {
-            return new BufferedReader(new FileReader(path));
-        } catch (FileNotFoundException e) {
-            return null;
-        }
-    }
-
     public static String getKeyInPemFormat(String type, Key key) throws IOException {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         PemObject pemObject = new PemObject(type, key.getEncoded());
@@ -40,30 +33,35 @@ public class UserEnroller {
         return outputStream.toString();
     }
 
-    public static void main(String[] args) throws Exception {
-        YamlConfig config = new YamlConfig(null);
-        FabricConfig fabricConfig = FabricConfig.getConfigFromFile("fabric.yaml");
+    public static void run(FabricConfig fabricConfig) throws Exception {
+        JsonNode usersDetails = fabricConfig.getUsersDetails();
+        if (usersDetails == null) {
+            throw new RuntimeException("User details not found");
+        }
 
-        String caKey = config.getValue(String.class, "ca_key", null);
-        if (caKey == null)
-            throw new RuntimeException("ca_key environment should be provided");
-        String userAffiliation = config.getValue(String.class, "user_affiliation", null);
-        if (userAffiliation == null)
-            throw new RuntimeException("user_affiliation environment should be provided");
+        String caKey = usersDetails.get("caKey").asText();
+        if (caKey == null) {
+            throw new RuntimeException("caKey should be provided");
+        }
 
-        String userFilePath = config.getValue(String.class, "user_file_path", "users.txt");
-        String destFilesRootPath = config.getValue(String.class, "dest_file_path", "users/");
-        String certFileName = config.getValue(String.class, "cert_file_name", "cert.pem");
-        String privateKeyFileName = config.getValue(String.class, "pk_file_name", "pk.pem");
+        String userAffiliation = usersDetails.get("userAffiliation").asText();
+        if (userAffiliation == null) {
+            throw new RuntimeException("userAffiliation should be provided");
+        }
+
+        String destFilesRootPath = usersDetails.path("destFilesPath").asText("users/");
+        String privateKeyFileName = usersDetails.path("privateKeyFileName").asText( "pk.pem");
+        String certFileName = usersDetails.path("certFileName").asText( "cert.pem");
+
         logger.info("Enrolling users at CA {}", caKey);
-        logger.info("Reading users from ({}), with affiliation ({}) and storing at ({}%%username%%) with cert in ({}) and pk in ({})",
-                userFilePath, userAffiliation, destFilesRootPath, certFileName, privateKeyFileName);
+        logger.info("Reading users with affiliation ({}) and storing at ({}%%username%%) with cert in ({}) and pk in ({})",
+                userAffiliation, destFilesRootPath, certFileName, privateKeyFileName);
 
-        BufferedReader usersReader = getUsersReader(userFilePath);
-        String userName = usersReader.readLine();
         long cnt = 0;
 
-        while (userName != null) {
+        for (JsonNode userNode : usersDetails.get("list")) {
+            String userName = userNode.textValue();
+
             logger.info("Processing user " + userName);
             HFCAClient hfcaClient = fabricConfig.createHFCAClient(caKey, null);
             User admin = fabricConfig.enrollAdmin(hfcaClient, caKey);
@@ -81,7 +79,6 @@ public class UserEnroller {
             } catch (Exception e) {
                 logger.error("Failed to process user {}", userName, e);
             }
-            userName = usersReader.readLine();
         }
         logger.info("Finished, successfully processed user count: {}", cnt);
     }
