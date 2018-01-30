@@ -3,7 +3,6 @@ package com.luxoft.fabric;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.utils.ConfigGenerator;
 import com.luxoft.fabric.utils.MiscUtils;
-
 import org.apache.commons.io.IOUtils;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.openssl.PEMParser;
@@ -57,7 +56,11 @@ public class FabricConfig extends YamlConfig {
     }
 
     public Iterator<JsonNode> getChannels() {
-        return getRoot().get("channels").elements();
+        JsonNode channels = getRoot().get("channels");
+        if (channels != null)
+            return channels.elements();
+        else
+            return Collections.emptyIterator();
     }
 
     public JsonNode getChannelDetails(String key) {
@@ -66,6 +69,43 @@ public class FabricConfig extends YamlConfig {
 
     public JsonNode getPeerDetails(String key) {
         return getRoot().get("peers").findValue(key);
+    }
+
+    protected List<String> getElementKeys(String elementName) {
+        Set<String> names = new HashSet<>();
+        JsonNode elements = getRoot().get(elementName);
+        if (elements == null)
+            return Collections.EMPTY_LIST;
+        elements.iterator().forEachRemaining(element -> names.add(element.fieldNames().next()));
+        return new ArrayList(names);
+    }
+
+    public List<String> getPeersKeys() {
+        return getElementKeys("peers");
+    }
+
+    public List<String> getOrderersKeys() {
+        return getElementKeys("orderers");
+    }
+
+    public List<String> getEventHubsKeys() {
+        return getElementKeys("eventhubs");
+    }
+
+    public List<String> getChaincodesKeys() {
+        return getElementKeys("chaincodes");
+    }
+
+    public List<String> getChannelsKeys() {
+        return getElementKeys("channels");
+    }
+
+    public List<String> getCAsKeys() {
+        return getElementKeys("cas");
+    }
+
+    public List<String> getAdminsKeys() {
+        return getElementKeys("admins");
     }
 
     public JsonNode getEventhubDetails(String key) {
