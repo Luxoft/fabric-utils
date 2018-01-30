@@ -47,6 +47,10 @@ public class FabricConfig extends YamlConfig {
         CryptoSuite.Factory.getCryptoSuite();
     }
 
+    public FabricConfig(Reader configReader) throws IOException {
+        this(configReader, null);
+    }
+
     public FabricConfig(Reader configReader, String confDir) throws IOException {
         super(configReader);
         this.confDir = confDir == null ? "." : confDir;
@@ -468,10 +472,12 @@ public class FabricConfig extends YamlConfig {
     private Properties jsonToProperties(JsonNode propertiesNode) {
         Properties peerProperties = new Properties();
 
-        Iterator<String> fieldNames = propertiesNode.fieldNames();
-        while (fieldNames.hasNext()) {
-            String field = fieldNames.next();
-            peerProperties.setProperty(field, propertiesNode.get(field).asText());
+        if (propertiesNode != null) {
+            Iterator<String> fieldNames = propertiesNode.fieldNames();
+            while (fieldNames.hasNext()) {
+                String field = fieldNames.next();
+                peerProperties.setProperty(field, propertiesNode.get(field).asText());
+            }
         }
         return peerProperties;
     }
