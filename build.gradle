@@ -9,17 +9,3 @@ sourceCompatibility = 1.8
 repositories {
     mavenCentral()
 }
-
-apply plugin: 'maven-publish'
-publishing {
-    repositories {
-        maven {
-            url "http://172.26.147.116:8081/repository/luxoft.blockchainlab/"
-        }
-    }
-    publications {
-        mavenJava(MavenPublication) {
-            from components.java
-        }
-    }
-}
