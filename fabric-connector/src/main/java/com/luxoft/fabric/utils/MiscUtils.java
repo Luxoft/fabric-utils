@@ -55,7 +55,7 @@ public class MiscUtils
 
         if (!Files.exists(path)) {
             // Trying to resolve file using glob pattern
-            List<Path> paths = getDirectoryList(Paths.get(topDir), fileName);
+            List<Path> paths = getDirectoryList(path.getParent(), path.getFileName().toString());
 
             if (paths.size() == 1) {
                 path = paths.get(0);

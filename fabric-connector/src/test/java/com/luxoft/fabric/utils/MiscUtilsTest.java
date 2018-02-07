@@ -13,6 +13,7 @@ public class MiscUtilsTest {
     public void testResolveFilePositive() {
         assertTrue(MiscUtils.resolveFile("README.md", ".").contains("README.md"));
         assertTrue(MiscUtils.resolveFile("*.md", ".").contains("README.md"));
+        assertTrue(MiscUtils.resolveFile("fabric-connector/*.md", "..").contains("README.md"));
     }
 
     @Test(expected = IllegalArgumentException.class)
