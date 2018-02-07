@@ -4,10 +4,10 @@ import com.google.common.collect.Lists;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
@@ -73,7 +73,7 @@ public class MiscUtils
 
     /**
      * Wrapper of {@link Files#newDirectoryStream(java.nio.file.Path, java.lang.String)} that returns list and not
-     * throws checked exception.
+     * throws exception.
      *
      * @param dir dir
      * @param glob glob
@@ -83,7 +83,7 @@ public class MiscUtils
         try {
             return Lists.newArrayList(Files.newDirectoryStream(dir, glob));
         } catch (IOException e) {
-            throw new UncheckedIOException(e);
+            return Collections.emptyList();
         }
     }
 }
