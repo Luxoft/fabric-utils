@@ -1,10 +1,13 @@
-#Fabric utils
-Project contains convenient client and utility tools for Hyperledger Fabric.
+# fabric-utils
+Fabric network interaction library (SDK wrapper), that contains its
+own network setup description format, network configuration utility,
+and convenience methods for working with Hyperledger Fabric.
 
-All tools uses `fabric.yaml` descriptor to get an overview of the Fabric network structure.
+All tools use `fabric.yaml` configuration file to get an overview of
+the Fabric network structure.
 
-##fabric.yaml structure
-###Client
+## fabric.yaml structure
+### Client
 To work with already configured channel you will need to provide following data
 - admins – list of users
     - key-name – key value that can be used for referring user in this config file
@@ -42,7 +45,11 @@ To work with already configured channel you will need to provide following data
         - adminSecret – secret of CA admin user
         - mspID – MSP identifier of organisation
 
+<<<<<<< HEAD
 ###Configurator
+=======
+### Configuration
+>>>>>>> 42fa8dcab23f4bbe2b7e382cebfdf7d2c5a5335f
 These fields are used to configure and update network config via fabric-configurator or NetworkManager's API:
 - chaincodes – list of chaincodes
     - key-name – key value that can be used for referring chaincode in this config file
@@ -60,4 +67,8 @@ These fields are used to configure and update network config via fabric-configur
     - key-name – key value that can be used for referring CA in which enroll users
         - userAffiliation – affiliation for users
         - list – user names
+<<<<<<< HEAD
         
+=======
+        
+>>>>>>> 42fa8dcab23f4bbe2b7e382cebfdf7d2c5a5335f
