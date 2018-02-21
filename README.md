@@ -6,8 +6,11 @@ and convenience methods for working with Hyperledger Fabric.
 All tools use `fabric.yaml` configuration file to get an overview of
 the Fabric network structure.
 
-## fabric.yaml structure
-### Client
+## Install
+
+## Usage
+### fabric.yaml structure
+#### Client
 To work with already configured channel you will need to provide following data
 - admins – list of users
     - key-name – key value that can be used for referring user in this config file
@@ -45,11 +48,8 @@ To work with already configured channel you will need to provide following data
         - adminSecret – secret of CA admin user
         - mspID – MSP identifier of organisation
 
-<<<<<<< HEAD
 ###Configurator
 =======
-### Configuration
->>>>>>> 42fa8dcab23f4bbe2b7e382cebfdf7d2c5a5335f
 These fields are used to configure and update network config via fabric-configurator or NetworkManager's API:
 - chaincodes – list of chaincodes
     - key-name – key value that can be used for referring chaincode in this config file
@@ -67,8 +67,14 @@ These fields are used to configure and update network config via fabric-configur
     - key-name – key value that can be used for referring CA in which enroll users
         - userAffiliation – affiliation for users
         - list – user names
-<<<<<<< HEAD
-        
-=======
-        
->>>>>>> 42fa8dcab23f4bbe2b7e382cebfdf7d2c5a5335f
+
+## Bugs
+Please use 'issues' on GitHub for spdxl.
+
+## Contribute
+Patches and pull requests are welcomed.
+
+## Copyright and License
+Copyright (c) 2017 Luxoft
+
+Licensed under the Apache 2.0 license, please see the LICENSE file for terms and conditions.
