@@ -52,14 +52,18 @@ public class FabricConnector {
 
         if (!initChannels) return;
         // init channels
-        for (Iterator<JsonNode> it = fabricConfig.getChannels(); it.hasNext(); ) {
-            String channel = it.next().fields().next().getKey();
-            fabricConfig.initChannel(hfClient, channel);
-        }
+        initChannels();
     }
 
     public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig) throws Exception {
         this(user, defaultChannelName, fabricConfig, true);
+    }
+
+    public void initChannels() throws Exception {
+        for (Iterator<JsonNode> it = fabricConfig.getChannels(); it.hasNext(); ) {
+            String channel = it.next().fields().next().getKey();
+            fabricConfig.initChannel(hfClient, channel);
+        }
     }
 
     public HFClient getHfClient() {
