@@ -1,10 +1,8 @@
 package com.luxoft.fabric;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import com.luxoft.YamlConfig;
 import com.luxoft.fabric.utils.ConfigGenerator;
 import com.luxoft.fabric.utils.MiscUtils;
-
 import org.apache.commons.io.IOUtils;
 import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.openssl.PEMParser;
@@ -41,23 +39,28 @@ public class FabricConfig extends YamlConfig {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     private final ConfigGenerator configGenerator = new ConfigGenerator();
-    private final Map<String,String> fileNameEnv = new HashMap<>();
+    private final String confDir;
 
     static {
         //loading Fabric security provider to the system
         CryptoSuite.Factory.getCryptoSuite();
     }
 
-    public FabricConfig(Reader configReader, String confdir) throws IOException {
-        super(configReader);
-        if (confdir == null)
-            confdir = ".";
+    public FabricConfig(Reader configReader) throws IOException {
+        this(configReader, null);
+    }
 
-        fileNameEnv.put("${confdir}", confdir);
+    public FabricConfig(Reader configReader, String confDir) throws IOException {
+        super(configReader);
+        this.confDir = confDir == null ? "." : confDir;
     }
 
     public Iterator<JsonNode> getChannels() {
-        return getRoot().get("channels").elements();
+        JsonNode channels = getRoot().get("channels");
+        if (channels != null)
+            return channels.elements();
+        else
+            return Collections.emptyIterator();
     }
 
     public JsonNode getChannelDetails(String key) {
@@ -66,6 +69,43 @@ public class FabricConfig extends YamlConfig {
 
     public JsonNode getPeerDetails(String key) {
         return getRoot().get("peers").findValue(key);
+    }
+
+    protected List<String> getElementKeys(String elementName) {
+        Set<String> names = new HashSet<>();
+        JsonNode elements = getRoot().get(elementName);
+        if (elements == null)
+            return Collections.EMPTY_LIST;
+        elements.iterator().forEachRemaining(element -> names.add(element.fieldNames().next()));
+        return new ArrayList(names);
+    }
+
+    public List<String> getPeersKeys() {
+        return getElementKeys("peers");
+    }
+
+    public List<String> getOrderersKeys() {
+        return getElementKeys("orderers");
+    }
+
+    public List<String> getEventHubsKeys() {
+        return getElementKeys("eventhubs");
+    }
+
+    public List<String> getChaincodesKeys() {
+        return getElementKeys("chaincodes");
+    }
+
+    public List<String> getChannelsKeys() {
+        return getElementKeys("channels");
+    }
+
+    public List<String> getCAsKeys() {
+        return getElementKeys("cas");
+    }
+
+    public List<String> getAdminsKeys() {
+        return getElementKeys("admins");
     }
 
     public JsonNode getEventhubDetails(String key) {
@@ -88,6 +128,10 @@ public class FabricConfig extends YamlConfig {
         return getRoot().get("cas").findValue(key);
     }
 
+    public JsonNode getUsersDetails() {
+        return getRoot().get("users");
+    }
+
     public String getFileName(JsonNode jsonNode, String name, String defaultValue) {
         final JsonNode node = jsonNode.get(name);
         String value = defaultValue;
@@ -97,7 +141,7 @@ public class FabricConfig extends YamlConfig {
         }
         else
             value = node.asText();
-        return MiscUtils.resolveFile(value, fileNameEnv);
+        return MiscUtils.resolveFile(value, confDir);
     }
 
     public String getFileName(JsonNode jsonNode, String name)
@@ -117,75 +161,79 @@ public class FabricConfig extends YamlConfig {
         return new FabricUser(adminName, null, null, enrollment, adminMspID);
     }
 
+    /**
+     * Create new orderer using fabric.yaml. Properties for orderer can be defined by corresponding key.
+     * List of supported properties:
+     * @see HFClient#newOrderer(String, String, Properties)
+     *
+     * @param hfClient Hyperledger Fabric client
+     * @param key key of the orderer in fabric.yaml
+     *
+     * @return the orderer
+     * @throws InvalidArgumentException throws by SDK in case of exception
+     */
     public Orderer getNewOrderer(HFClient hfClient, String key) throws InvalidArgumentException {
         JsonNode ordererParameters = requireNonNull(getOrdererDetails(key));
 
         String ordererUrl = ordererParameters.get("url").asText();
-
         String ordererPemFile = getFileName(ordererParameters, "pemFile", "");
-        String ordererSSLProvider = ordererParameters.path("sslProvider").asText("openSSL");
-        String ordererNegotiationType = ordererParameters.path("negotiationType").asText("TLS");
-        String ordererHostnameOverride = ordererParameters.path("hostnameOverride").asText("");
-        String ordererWaitTimeMilliSecs = ordererParameters.path("waitTime").asText("2000");
 
-        Properties ordererProperties = null;
-        if (!ordererPemFile.isEmpty()) {
-            ordererProperties = new Properties();
-            ordererProperties.setProperty("pemFile", ordererPemFile);
-            ordererProperties.setProperty("sslProvider", ordererSSLProvider);
-            ordererProperties.setProperty("negotiationType", ordererNegotiationType);
-            ordererProperties.setProperty("ordererWaitTimeMilliSecs", ordererWaitTimeMilliSecs);
-            if (!ordererHostnameOverride.isEmpty())
-                ordererProperties.setProperty("hostnameOverride", ordererHostnameOverride);
-        }
+        Properties ordererProperties = jsonToProperties(ordererParameters.get("properties"));
+        ordererProperties.setProperty("pemFile", ordererPemFile);
+
+        logger.info("Creating Orderer with props: {}", ordererProperties);
 
         return hfClient.newOrderer(key, ordererUrl, ordererProperties);
     }
 
+    /**
+     * Create new peer using fabric.yaml. Properties for peer can be defined by corresponding key.
+     * List of supported properties:
+     * @see HFClient#newPeer(String, String, Properties)
+     *
+     * @param hfClient Hyperledger Fabric client
+     * @param key key of the peer in fabric.yaml
+     *
+     * @return the peer
+     * @throws InvalidArgumentException throws by SDK in case of exception
+     */
     public Peer getNewPeer(HFClient hfClient, String key) throws InvalidArgumentException {
         JsonNode peerParameters = requireNonNull(getPeerDetails(key));
 
         String peerUrl = peerParameters.get("url").asText();
-
         String peerName = peerParameters.path("name").asText(key);
         String peerPemFile = getFileName(peerParameters, "pemFile", "");
-        String peerSSLProvider = peerParameters.path("sslProvider").asText("openSSL");
-        String peerNegotiationType = peerParameters.path("negotiationType").asText("TLS");
-        String peerHostnameOverride = peerParameters.path("hostnameOverride").asText("");
 
-        Properties peerProperties = null;
-        if (!peerPemFile.isEmpty()) {
-            peerProperties = new Properties();
-            peerProperties.setProperty("pemFile", peerPemFile);
-            peerProperties.setProperty("sslProvider", peerSSLProvider);
-            peerProperties.setProperty("negotiationType", peerNegotiationType);
-            if (!peerHostnameOverride.isEmpty())
-                peerProperties.setProperty("hostnameOverride", peerHostnameOverride);
-        }
+        Properties peerProperties = jsonToProperties(peerParameters.get("properties"));
+        peerProperties.setProperty("pemFile", peerPemFile);
+
+        logger.info("Creating Peer with props: {}", peerProperties);
 
         return hfClient.newPeer(peerName, peerUrl, peerProperties);
     }
 
+    /**
+     * Create new eventhub using fabric.yaml. Properties for eventhub can be defined by corresponding key.
+     * List of supported properties:
+     * @see HFClient#newEventHub(String, String, Properties)
+     *
+     * @param hfClient Hyperledger Fabric client
+     * @param key key of the eventhub in fabric.yaml
+     *
+     * @return the eventhub
+     * @throws InvalidArgumentException throws by SDK in case of exception
+     */
     public EventHub getNewEventhub(HFClient hfClient, String key) throws InvalidArgumentException {
         JsonNode eventhubParameters = requireNonNull(getEventhubDetails(key));
 
         String eventhubUrl = eventhubParameters.get("url").asText();
-
         String eventhubName = eventhubParameters.path("name").asText(key);
         String eventhubPemFile = getFileName(eventhubParameters, "pemFile", "");
-        String eventhubSSLProvider = eventhubParameters.path("sslProvider").asText("openSSL");
-        String eventhubNegotiationType = eventhubParameters.path("negotiationType").asText("TLS");
-        String eventhubHostnameOverride = eventhubParameters.path("hostnameOverride").asText("");
 
-        Properties eventhubProperties = null;
-        if (!eventhubPemFile.isEmpty()) {
-            eventhubProperties = new Properties();
-            eventhubProperties.setProperty("pemFile", eventhubPemFile);
-            eventhubProperties.setProperty("sslProvider", eventhubSSLProvider);
-            eventhubProperties.setProperty("negotiationType", eventhubNegotiationType);
-            if (!eventhubHostnameOverride.isEmpty())
-                eventhubProperties.setProperty("hostnameOverride", eventhubHostnameOverride);
-        }
+        Properties eventhubProperties = jsonToProperties(eventhubParameters.get("properties"));
+        eventhubProperties.setProperty("pemFile", eventhubPemFile);
+
+        logger.info("Creating Eventhub with props: {}", eventhubProperties);
 
         return hfClient.newEventHub(eventhubName, eventhubUrl, eventhubProperties);
     }
@@ -287,8 +335,6 @@ public class FabricConfig extends YamlConfig {
         String chaincodeVersion = chaincodeParameters.path("version").asText("0");
         ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
 
-        String endorsementPolicy = chaincodeParameters.path("endorsementPolicy").asText("");
-
         List<String> chaincodeInitArguments = new ArrayList<>();
         chaincodeParameters.withArray("initArguments").forEach(element -> chaincodeInitArguments.add(element.asText()));
 
@@ -301,6 +347,8 @@ public class FabricConfig extends YamlConfig {
         tm.put("HyperLedgerFabric", "InstantiateProposalRequest:JavaSDK".getBytes(UTF_8));
         tm.put("method", "InstantiateProposalRequest".getBytes(UTF_8));
         instantiateProposalRequest.setTransientMap(tm);
+
+        String endorsementPolicy = getFileName(chaincodeParameters, "endorsementPolicy", "");
         if (!endorsementPolicy.isEmpty()) {
             ChaincodeEndorsementPolicy chaincodeEndorsementPolicy = new ChaincodeEndorsementPolicy();
             chaincodeEndorsementPolicy.fromYamlFile(new File(endorsementPolicy));
@@ -454,5 +502,23 @@ public class FabricConfig extends YamlConfig {
         } catch (IOException e) {
             throw new RuntimeException("Unable to read config file " + configFile, e);
         }
+    }
+
+    /**
+     * Convert JSON node to Java properties.
+     * @param propertiesNode node with properties
+     * @return properties with key as JSON key and value as JSON value
+     */
+    private Properties jsonToProperties(JsonNode propertiesNode) {
+        Properties peerProperties = new Properties();
+
+        if (propertiesNode != null) {
+            Iterator<String> fieldNames = propertiesNode.fieldNames();
+            while (fieldNames.hasNext()) {
+                String field = fieldNames.next();
+                peerProperties.setProperty(field, propertiesNode.get(field).asText());
+            }
+        }
+        return peerProperties;
     }
 }

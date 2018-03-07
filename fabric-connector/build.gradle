@@ -1,0 +1,50 @@
+group 'com.luxoft'
+version rootProject.version
+
+apply plugin: 'java'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+    maven {
+        url "http://172.26.147.116:8081/repository/luxoft.blockchainlab/"
+    }
+}
+
+dependencies {
+
+    compile(group: 'org.hyperledger.fabric-sdk-java', name: 'fabric-sdk-java', version: '1.0.1-luxoft_events.1') {
+        exclude(group: 'junit', module: 'junit')
+        exclude(group: 'io.netty', module: 'netty-tcnative-boringssl-static')
+    }
+
+    // fabric java SDK depends on 2.0.5.Final
+    compile group: 'io.netty', name: 'netty-tcnative-luxoft-openssl-static', version: '2.0.5.Final'
+
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.8.9'
+    compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.8.9'
+    compile group: 'com.fasterxml.jackson.dataformat', name: 'jackson-dataformat-yaml', version: '2.8.9'
+    compile group: 'commons-io', name: 'commons-io', version: '2.5'
+
+    compile group: 'net.sf.jopt-simple', name: 'jopt-simple', version: '5.0.4'
+    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.21'
+    compile group: 'ch.qos.logback', name: 'logback-core', version: '1.2.3'
+    compile group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
+
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+}
+
+apply plugin: 'maven-publish'
+publishing {
+    repositories {
+        maven {
+            url "http://172.26.147.116:8081/repository/luxoft.blockchainlab/"
+        }
+    }
+    publications {
+        mavenJava(MavenPublication) {
+            from components.java
+        }
+    }
+}

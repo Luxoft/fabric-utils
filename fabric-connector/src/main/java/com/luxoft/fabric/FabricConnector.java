@@ -21,6 +21,10 @@ public class FabricConnector {
 
     private String defaultChannelName;
 
+    public FabricConnector(FabricConfig fabricConfig, Boolean initChannels) throws Exception {
+        this(null, null, fabricConfig, initChannels);
+    }
+
     public FabricConnector(FabricConfig fabricConfig) throws Exception {
         this(null, null, fabricConfig);
     }
@@ -33,7 +37,7 @@ public class FabricConnector {
         this(null, defaultChannelName, fabricConfig);
     }
 
-    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig) throws Exception {
+    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig, Boolean initChannels) throws Exception {
         this.fabricConfig = fabricConfig;
         this.defaultChannelName = defaultChannelName;
 
@@ -41,9 +45,21 @@ public class FabricConnector {
         CryptoSuite cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
         hfClient.setCryptoSuite(cryptoSuite);
 
-        if(user != null) hfClient.setUserContext(user);
+        if (user != null)
+            hfClient.setUserContext(user);
+        else if (hfClient.getUserContext() == null)
+            hfClient.setUserContext(fabricConfig.getAdmin(fabricConfig.getAdminsKeys().get(0)));
 
+        if (!initChannels) return;
         // init channels
+        initChannels();
+    }
+
+    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig) throws Exception {
+        this(user, defaultChannelName, fabricConfig, true);
+    }
+
+    public void initChannels() throws Exception {
         for (Iterator<JsonNode> it = fabricConfig.getChannels(); it.hasNext(); ) {
             String channel = it.next().fields().next().getKey();
             fabricConfig.initChannel(hfClient, channel);
@@ -61,6 +77,10 @@ public class FabricConnector {
 
     public Channel getDefaultChannel() {
         return getChannel(defaultChannelName);
+    }
+    
+    public FabricConfig getFabricConfig() {
+        return fabricConfig;
     }
 
     public void setUserContext(User user) throws Exception {
@@ -211,14 +231,14 @@ public class FabricConnector {
 
     public CompletableFuture<byte[]> sendQueryRequest(QueryByChaincodeRequest request, String channelName) {
         return CompletableFuture.supplyAsync(() -> {
-            String lastFailReason = "no responses received";
+            ProposalResponse lastFailProposal = null;
             try {
                 Channel channel = hfClient.getChannel(channelName);
                 if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
                 final Collection<ProposalResponse> proposalResponses = channel.queryByChaincode(request);
                 for (ProposalResponse proposalResponse : proposalResponses) {
                     if (!proposalResponse.isVerified() || proposalResponse.getStatus() != ProposalResponse.Status.SUCCESS) {
-                        lastFailReason = proposalResponse.getMessage();
+                        lastFailProposal = proposalResponse;
                         continue;
                     }
                     return proposalResponse.getChaincodeActionResponsePayload();
@@ -226,7 +246,12 @@ public class FabricConnector {
             } catch (Exception e) {
                 throw new RuntimeException("Unable to send query", e);
             }
-            throw new RuntimeException("Unable to send query, because: " + lastFailReason);
+            if (lastFailProposal == null) {
+                throw new RuntimeException("Unable to process query, no responses received");
+            } else {
+                throw new RuntimeException(String.format("Unable to process query, txId: %s, message: %s",
+                        lastFailProposal.getTransactionID(), lastFailProposal.getMessage()));
+            }
         });
     }
 
