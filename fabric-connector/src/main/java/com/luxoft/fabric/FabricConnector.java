@@ -54,7 +54,7 @@ public class FabricConnector {
         // init channels
         for (Iterator<JsonNode> it = fabricConfig.getChannels(); it.hasNext(); ) {
             String channel = it.next().fields().next().getKey();
-            fabricConfig.initChannel(hfClient, channel);
+            fabricConfig.initChannel(hfClient, channel, hfClient.getUserContext());
         }
     }
 
