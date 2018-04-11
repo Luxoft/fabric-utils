@@ -21,6 +21,10 @@ public class FabricConnector {
 
     private String defaultChannelName;
 
+    public FabricConnector(FabricConfig fabricConfig, Boolean initChannels) throws Exception {
+        this(null, null, fabricConfig, initChannels);
+    }
+
     public FabricConnector(FabricConfig fabricConfig) throws Exception {
         this(null, null, fabricConfig);
     }
@@ -33,7 +37,7 @@ public class FabricConnector {
         this(null, defaultChannelName, fabricConfig);
     }
 
-    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig) throws Exception {
+    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig, Boolean initChannels) throws Exception {
         this.fabricConfig = fabricConfig;
         this.defaultChannelName = defaultChannelName;
 
@@ -41,17 +45,33 @@ public class FabricConnector {
         CryptoSuite cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
         hfClient.setCryptoSuite(cryptoSuite);
 
-        if(user != null) hfClient.setUserContext(user);
+        if (user != null)
+            hfClient.setUserContext(user);
+        else if (hfClient.getUserContext() == null)
+            hfClient.setUserContext(fabricConfig.getAdmin(fabricConfig.getAdminsKeys().get(0)));
 
+        if (!initChannels) return;
         // init channels
+        initChannels();
+    }
+
+    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig) throws Exception {
+        this(user, defaultChannelName, fabricConfig, true);
+    }
+
+    public void initChannels() throws Exception {
         for (Iterator<JsonNode> it = fabricConfig.getChannels(); it.hasNext(); ) {
             String channel = it.next().fields().next().getKey();
-            fabricConfig.initChannel(hfClient, channel);
+            fabricConfig.initChannel(hfClient, channel, hfClient.getUserContext());
         }
     }
 
     public HFClient getHfClient() {
         return hfClient;
+    }
+
+    public FabricConfig getFabricConfig() {
+        return fabricConfig;
     }
 
     public void setUserContext(User user) throws Exception {

@@ -64,8 +64,6 @@ public class NetworkManager {
                     eventhubList.add(eventhub);
                 }
 
-//                Channel channel = fabricConfig.generateChannel(hfClient, channelName, fabricUser, orderer);
-
                 Set<String> installedChannels = hfClient.queryChannels(peerList.get(0));
                 boolean alreadyInstalled = false;
 
@@ -76,9 +74,9 @@ public class NetworkManager {
                 boolean newChannel = false;
                 Channel channel;
                 if (!alreadyInstalled) {
-                    try {
                         String txFile = fabricConfig.getFileName(channelParameters, "txFile");
                         ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
+                    try {
                         byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, hfClient.getUserContext());
                         channel = hfClient.newChannel(channelName, ordererList.get(0), channelConfiguration, channelConfigurationSignature);
                         newChannel = true;
@@ -87,6 +85,8 @@ public class NetworkManager {
                         Orderer newOrderer = fabricConfig.getNewOrderer(hfClient, ordererList.get(0).getName());
                         ordererList.set(0, newOrderer);
                         channel = hfClient.newChannel(channelName);
+                        System.out.println("Exception happened while creating channel, this might not be a problem");
+                        ex.printStackTrace();
                     }
                 } else {
                     channel = hfClient.newChannel(channelName);
