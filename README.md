@@ -48,8 +48,8 @@ To work with already configured channel you will need to provide following data
         - adminSecret – secret of CA admin user
         - mspID – MSP identifier of organisation
 
-###Configurator
-=======
+### Configurator
+
 These fields are used to configure and update network config via fabric-configurator or NetworkManager's API:
 - chaincodes – list of chaincodes
     - key-name – key value that can be used for referring chaincode in this config file
