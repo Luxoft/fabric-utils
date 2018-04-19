@@ -12,6 +12,9 @@ import java.io.File;
 import java.nio.charset.Charset;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.junit.Assert.*;
 
 /**
  * Integration tests for Fabric connector
@@ -35,7 +38,7 @@ public class FabricConnectorIntegrationTest {
 
     @AfterClass
     public static void tearDown() {
-        execInDirectory("./fabric.sh clean", "../files/artifacts/");
+//        execInDirectory("./fabric.sh clean", "../files/artifacts/");
     }
 
     /**
@@ -57,7 +60,56 @@ public class FabricConnectorIntegrationTest {
         Assert.assertArrayEquals(value, queryFuture.get());
     }
 
-    public static int execInDirectory(String cmd, String dir) {
+    @Test
+    public void testTxRace() throws Exception {
+        FabricConnector fabricConnector = new FabricConnector(fabricConfig);
+
+        AtomicInteger success = new AtomicInteger();
+
+        byte[] key = "someKey".getBytes();
+        String value1 = "value1";
+        String value2 = "value2";
+
+        CompletableFuture<BlockEvent.TransactionEvent> putEventFuture = fabricConnector.invoke(
+                "put", "mychcode", "mychannel", key, value1.getBytes());
+
+        CompletableFuture<BlockEvent.TransactionEvent> putEventFuture2 = fabricConnector.invoke(
+                "put", "mychcode", "mychannel", key, value2.getBytes());
+
+        putEventFuture.exceptionally(t -> {
+            t.printStackTrace();
+            fail();
+            return null;
+        }).thenAcceptAsync(tx -> {
+            System.out.println("Tx 1 finished");
+            assertTrue(tx.isValid());
+            success.getAndIncrement();
+        });
+
+        putEventFuture2.exceptionally(t -> {
+            t.printStackTrace();
+            fail();
+            return null;
+        }).thenAcceptAsync(tx -> {
+            System.out.println("Tx 2 finished");
+            assertTrue(tx.isValid());
+            success.getAndIncrement();
+        });
+
+        // To wait until all tx commit
+        Thread.sleep(10000);
+
+        CompletableFuture<byte[]> queryFuture = fabricConnector.query(
+                "get", "mychcode", "mychannel", key);
+
+        String finalValue = new String(queryFuture.get());
+
+        // Its race so anyone can finish first
+        assertTrue(finalValue.equals(value1) || finalValue.equals(value2));
+        assertEquals(2, success.get());
+    }
+
+    private static int execInDirectory(String cmd, String dir) {
         try {
             Process process = new ProcessBuilder()
                     .command(cmd.split(" "))
