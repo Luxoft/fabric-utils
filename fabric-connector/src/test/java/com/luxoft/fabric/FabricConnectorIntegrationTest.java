@@ -38,7 +38,7 @@ public class FabricConnectorIntegrationTest {
 
     @AfterClass
     public static void tearDown() {
-//        execInDirectory("./fabric.sh clean", "../files/artifacts/");
+        execInDirectory("./fabric.sh clean", "../files/artifacts/");
     }
 
     /**

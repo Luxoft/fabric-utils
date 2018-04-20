@@ -1,7 +1,6 @@
 package com.luxoft.fabric;
 
 import com.fasterxml.jackson.databind.JsonNode;
-import org.hyperledger.fabric.protos.peer.FabricTransaction;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.TransactionEventException;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
@@ -11,6 +10,9 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Function;
+
+import static org.hyperledger.fabric.protos.peer.FabricTransaction.TxValidationCode.MVCC_READ_CONFLICT_VALUE;
+import static org.hyperledger.fabric.protos.peer.FabricTransaction.TxValidationCode.PHANTOM_READ_CONFLICT_VALUE;
 
 /**
  * Created by nvolkov on 26.07.17.
@@ -300,15 +302,15 @@ public class FabricConnector {
                     .exceptionally(t -> {
                         try {
                             int validationCode = ((TransactionEventException) t.getCause()).getTransactionEvent().getValidationCode();
-                            if (validationCode == FabricTransaction.TxValidationCode.MVCC_READ_CONFLICT_VALUE ||
-                                validationCode == FabricTransaction.TxValidationCode.PHANTOM_READ_CONFLICT_VALUE )
-                            {
-                                logger.error("", t);
-                                // if ReadSet-related error we recreate transaction
-                                return delayedTransaction(() -> sendTransaction(buildProposalRequest(function, chaincode, message), channelName), txRetryDelayMs);
-                            } else {
-                                // fail on other Tx errors, retries won't help here
-                                return failedFuture(t);
+                            switch(validationCode) {
+                                case MVCC_READ_CONFLICT_VALUE:
+                                case PHANTOM_READ_CONFLICT_VALUE:
+                                    logger.error("", t);
+                                    // if ReadSet-related error we recreate transaction
+                                    return delayedTransaction(() -> sendTransaction(buildProposalRequest(function, chaincode, message), channelName), txRetryDelayMs);
+                                default:
+                                    // fail on other Tx errors, retries won't help here
+                                    return failedFuture(t);
                             }
                         } catch (Throwable e) {
                             // In case of any unexpected errors
