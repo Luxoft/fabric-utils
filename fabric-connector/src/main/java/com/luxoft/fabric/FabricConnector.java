@@ -25,7 +25,6 @@ public class FabricConnector {
     protected FabricConfig fabricConfig;
 
     private String defaultChannelName;
-    private long txRetryDelayMs = 3000;
     private int defaultMaxRetries = 3;
 
     public FabricConnector(FabricConfig fabricConfig, Boolean initChannels) throws Exception {
@@ -77,14 +76,6 @@ public class FabricConnector {
 
     public void setDefaultMaxRetries(int defaultMaxRetries) {
         this.defaultMaxRetries = defaultMaxRetries;
-    }
-
-    public long getTxRetryDelayMs() {
-        return txRetryDelayMs;
-    }
-
-    public void setTxRetryDelayMs(long txRetryDelayMs) {
-        this.txRetryDelayMs = txRetryDelayMs;
     }
 
     public HFClient getHfClient() {
@@ -275,26 +266,26 @@ public class FabricConnector {
         return sendQueryRequest(buildQueryRequest(function, chaincode, message), channelName);
     }
 
-    public CompletableFuture<InvokeResult> invokeEx(String function, String chaincode, byte[]... message) throws Exception {
+    public CompletableFuture<InvokeResult> invokeEx(String function, String chaincode, byte[]... message) {
         return sendTransactionEx(buildProposalRequest(function, chaincode, message), defaultChannelName);
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, byte[]... message) throws Exception {
+    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, byte[]... message) {
         return invoke(function, chaincode, defaultChannelName, defaultMaxRetries, message);
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, byte[]... message) throws Exception {
+    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, byte[]... message) {
         return invoke(function, chaincode, channelName, defaultMaxRetries, message);
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, int maxRetries, byte[]... message) throws Exception {
+    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, int maxRetries, byte[]... message) {
         return invoke(function, chaincode, defaultChannelName, maxRetries, message);
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, int maxRetries, byte[]... message) throws Exception {
+    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, int maxRetries, byte[]... message) {
         CompletableFuture<BlockEvent.TransactionEvent> f = sendTransaction(buildProposalRequest(function, chaincode, message), channelName);
 
-        // Here we handle retry 'maxRetries' times after 'txRetryDelayMs'
+        // Here we handle retry 'maxRetries' times
         // Basically we just chain N(='maxRetries') dummy futures that push successful one further
         // In case of exception it checks transaction error code and either push forward the exception or recreates transaction on retry-able errors
         for(int i = 0; i < maxRetries; i++) {
@@ -307,7 +298,7 @@ public class FabricConnector {
                                 case PHANTOM_READ_CONFLICT_VALUE:
                                     logger.error("", t);
                                     // if ReadSet-related error we recreate transaction
-                                    return delayedTransaction(() -> sendTransaction(buildProposalRequest(function, chaincode, message), channelName), txRetryDelayMs);
+                                    return sendTransaction(buildProposalRequest(function, chaincode, message), channelName);
                                 default:
                                     // fail on other Tx errors, retries won't help here
                                     return failedFuture(t);
@@ -320,23 +311,6 @@ public class FabricConnector {
                     .thenCompose(Function.identity());
         }
         return f;
-    }
-
-    private CompletableFuture<BlockEvent.TransactionEvent> delayedTransaction(TransactionFutureBuilder txFutureBuilder, long delayMs) {
-        CompletableFuture<Void> future = new CompletableFuture<>();
-
-        // We create Executor on demand and then kill it because its rare situation and we don't want to keep it up all the time
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
-        // Here we create future that starts timer to complete next future in the chain to finally start real Tx future
-        return CompletableFuture.runAsync(() -> scheduler.schedule(() -> { future.complete(null); scheduler.shutdown(); }, delayMs, TimeUnit.MILLISECONDS))
-                .thenCompose(r -> future)
-                .thenCompose(r -> txFutureBuilder.build());
-    }
-
-    // Functional interface for building sendTransaction futures
-    private interface TransactionFutureBuilder {
-        CompletableFuture<BlockEvent.TransactionEvent> build();
     }
 
     // In Java 9 we already have such method but while we are on 8...
