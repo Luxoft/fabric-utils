@@ -83,7 +83,15 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 		}
 		key := args[0]
 		value := args[1]
-		
+
+		// Check current value
+		currentValue, err := stub.GetState(key)
+		if err != nil {
+			fmt.Printf("Error putting state %s", err)
+			return shim.Error(fmt.Sprintf("put operation failed. Error updating state: %s", err))
+		}
+		fmt.Printf("Current value len: %d", len(currentValue))
+
 		if err := stub.PutState(key, []byte(value)); err != nil {
 			fmt.Printf("Error putting state %s", err)
 			return shim.Error(fmt.Sprintf("put operation failed. Error updating state: %s", err))
