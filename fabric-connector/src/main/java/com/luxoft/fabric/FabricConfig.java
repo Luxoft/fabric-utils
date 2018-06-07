@@ -59,7 +59,15 @@ public class FabricConfig extends YamlConfig {
 
     static {
         //loading Fabric security provider to the system
-        CryptoSuite.Factory.getCryptoSuite();
+        getCryptoSuite();
+    }
+
+    public static CryptoSuite getCryptoSuite() {
+        try {
+            return CryptoSuite.Factory.getCryptoSuite();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public FabricConfig(Reader configReader) throws IOException {
@@ -465,7 +473,7 @@ public class FabricConfig extends YamlConfig {
 
     public HFCAClient createHFCAClient(String caKey, CryptoSuite cryptoSuite) throws MalformedURLException {
         if (cryptoSuite == null)
-            cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
+            cryptoSuite = getCryptoSuite();
         HFCAClient hfcaClient = createHFCAClient(caKey);
         hfcaClient.setCryptoSuite(cryptoSuite);
         return hfcaClient;

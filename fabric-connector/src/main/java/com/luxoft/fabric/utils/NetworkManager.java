@@ -3,8 +3,6 @@ package com.luxoft.fabric.utils;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.FabricConfig;
 import org.hyperledger.fabric.sdk.*;
-import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
-import org.hyperledger.fabric.sdk.exception.ProposalException;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 
 import java.io.File;
@@ -15,13 +13,13 @@ import java.util.*;
  * Created by ADoroganov on 25.07.2017.
  */
 public class NetworkManager {
-    public static void configNetwork(final FabricConfig fabricConfig) throws IOException {
+    public static void configNetwork(final FabricConfig fabricConfig) {
 
         Iterator<JsonNode> channels = fabricConfig.getChannels();
         if (!channels.hasNext())
             throw new RuntimeException("Need at least one channel to do some work");
 
-        CryptoSuite cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
+        CryptoSuite cryptoSuite = FabricConfig.getCryptoSuite();
         Set<String> installedChaincodes = new HashSet<>();
 
         while (channels.hasNext()) {
@@ -191,7 +189,7 @@ public class NetworkManager {
     }
 
 
-    private static void installChaincodes(HFClient hfc, FabricConfig fabricConfig, Set<String> installedChaincodes, List<Peer> peers, String chaincodeKey) throws InvalidArgumentException, ProposalException {
+    private static void installChaincodes(HFClient hfc, FabricConfig fabricConfig, Set<String> installedChaincodes, List<Peer> peers, String chaincodeKey){
         for (Peer peer : peers) {
             String chaincodeInstallKey = chaincodeKey + "@" + peer.getName();
             if (!installedChaincodes.contains(chaincodeInstallKey)) {
