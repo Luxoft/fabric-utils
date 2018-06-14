@@ -2,6 +2,7 @@ package com.luxoft.fabric.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.FabricConfig;
+import org.hyperledger.fabric.protos.peer.Query;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
@@ -22,7 +23,6 @@ public class NetworkManager {
             throw new RuntimeException("Need at least one channel to do some work");
 
         CryptoSuite cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
-        Set<String> installedChaincodes = new HashSet<>();
 
         while (channels.hasNext()) {
             Map.Entry<String, JsonNode> channelObject = channels.next().fields().next();
@@ -64,16 +64,20 @@ public class NetworkManager {
                     eventhubList.add(eventhub);
                 }
 
-                Set<String> installedChannels = hfClient.queryChannels(peerList.get(0));
-                boolean alreadyInstalled = false;
-
-                for (String installedChannelName : installedChannels) {
-                    if (installedChannelName.equalsIgnoreCase(channelName)) alreadyInstalled = true;
+                //Looking for channels on peers, to find has already joined
+                Set<Peer> peersWithChannel = new HashSet<>();
+                boolean channelExists = false;
+                for (Peer peer : peerList) {
+                    Set<String> joinedChannels = hfClient.queryChannels(peer);
+                    if (joinedChannels.stream().anyMatch(installedChannelName -> installedChannelName.equalsIgnoreCase(channelName))) {
+                        channelExists = true;
+                        peersWithChannel.add(peer);
+                    }
                 }
 
                 boolean newChannel = false;
                 Channel channel;
-                if (!alreadyInstalled) {
+                if (!channelExists) {
                         String txFile = fabricConfig.getFileName(channelParameters, "txFile");
                         ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
                     try {
@@ -95,28 +99,31 @@ public class NetworkManager {
                 for (int i = newChannel ? 1 : 0; i < ordererList.size(); i++) {
                     channel.addOrderer(ordererList.get(i));
                 }
-
-                if (!alreadyInstalled) {
-                    for (Peer peer : peerList) {
-                        channel.joinPeer(peer);
-                    }
-                } else {
-                    for (Peer peer : peerList) {
+                for (Peer peer : peerList) {
+                    if (peersWithChannel.contains(peer))
                         channel.addPeer(peer);
-                    }
+                    else
+                        channel.joinPeer(peer);
                 }
-
 
                 for (EventHub eventhub : eventhubList) {
                     channel.addEventHub(eventhub);
                 }
                 channel.initialize();
+                List<Query.ChaincodeInfo> chaincodeInfoList = new ArrayList<>();
+                for (Peer peer : peerList) {
+                    chaincodeInfoList.addAll(channel.queryInstantiatedChaincodes(peer));
+                }
 
                 for (JsonNode jsonNode : channelParameters.get("chaincodes")) {
                     String chaincodeKey = jsonNode.asText();
+                    ChaincodeID chaincodeID = fabricConfig.getChaincodeID(chaincodeKey);
 
-                    installChaincodes(hfClient, fabricConfig, installedChaincodes, peerList, chaincodeKey);
-
+                    installChaincodes(hfClient, fabricConfig, peerList, chaincodeKey);
+                    if (chaincodeInfoList.stream().anyMatch(chaincodeInfo -> MiscUtils.equals(chaincodeID, chaincodeInfo))) {
+                        System.out.println("Chaincode(" + chaincodeKey + ") was already instantiated, skipping");
+                        continue;
+                    }
                     try {
                         fabricConfig.instantiateChaincode(hfClient, channel, chaincodeKey).get();
                     } catch (Exception e) {
@@ -131,7 +138,6 @@ public class NetworkManager {
 
     public static void deployChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {
 
-        Set<String> installedChaincodes = new HashSet<>();
         Iterator<JsonNode> channels = fabricConfig.getChannels();
         while (channels.hasNext()) {
             Map.Entry<String, JsonNode> channelObject = channels.next().fields().next();
@@ -155,7 +161,7 @@ public class NetworkManager {
 
                 String chaincodeKey = jsonNode.asText();
 
-                installChaincodes(hfc, fabricConfig, installedChaincodes, peers, chaincodeKey);
+                installChaincodes(hfc, fabricConfig, peers, chaincodeKey);
 
                 fabricConfig.instantiateChaincode(hfc, channel, chaincodeKey).get();
             }
@@ -191,13 +197,13 @@ public class NetworkManager {
     }
 
 
-    private static void installChaincodes(HFClient hfc, FabricConfig fabricConfig, Set<String> installedChaincodes, List<Peer> peers, String chaincodeKey) throws InvalidArgumentException, ProposalException {
+    private static void installChaincodes(HFClient hfc, FabricConfig fabricConfig, List<Peer> peers, String chaincodeKey) throws InvalidArgumentException, ProposalException {
+        ChaincodeID chaincodeID = fabricConfig.getChaincodeID(chaincodeKey);
         for (Peer peer : peers) {
-            String chaincodeInstallKey = chaincodeKey + "@" + peer.getName();
-            if (!installedChaincodes.contains(chaincodeInstallKey)) {
+            List<Query.ChaincodeInfo> peerInstallerChaincodes = hfc.queryInstalledChaincodes(peer);
+            if (peerInstallerChaincodes.stream().noneMatch(installedChaincode -> MiscUtils.equals(chaincodeID, installedChaincode))) {
                 try {
                     fabricConfig.installChaincode(hfc, Collections.singletonList(peer), chaincodeKey);
-                    installedChaincodes.add(chaincodeInstallKey);
                 } catch (Exception e) {
                     e.printStackTrace();
                 }

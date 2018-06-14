@@ -313,19 +313,27 @@ public class FabricConfig extends YamlConfig {
         return channel;
     }
 
+    public ChaincodeID getChaincodeID(String key) {
+        return getChaincodeID(getChaincodeDetails(key));
+    }
+
+    public ChaincodeID getChaincodeID(JsonNode chaincodeParameters) {
+        String chaincodeIDString = chaincodeParameters.get("id").asText();
+        String chaincodePath = chaincodeParameters.get("sourceLocation").asText();
+        String chaincodeVersion = chaincodeParameters.path("version").asText("0");
+
+        return ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
+    }
 
     public void installChaincode(HFClient hfClient, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException {
         JsonNode chaincodeParameters = getChaincodeDetails(key);
 
-        String chaincodeIDString = chaincodeParameters.get("id").asText();
-        String chaincodePath = chaincodeParameters.get("sourceLocation").asText();
-
         // String chaincodePathPrefix = chaincodeParameters.path("sourceLocationPrefix").asText("chaincode");
         String chaincodePathPrefix = getFileName(chaincodeParameters, "sourceLocationPrefix", "chaincode");
-        String chaincodeVersion = chaincodeParameters.path("version").asText("0");
         String chaincodeType = chaincodeParameters.path("type").asText("GO_LANG");
 
-        ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
+        ChaincodeID chaincodeID = getChaincodeID(chaincodeParameters);
+        String chaincodeVersion = chaincodeID.getVersion();
 
         InstallProposalRequest installProposalRequest = hfClient.newInstallProposalRequest();
         installProposalRequest.setChaincodeID(chaincodeID);
@@ -346,10 +354,7 @@ public class FabricConfig extends YamlConfig {
 
         JsonNode chaincodeParameters = getChaincodeDetails(key);
 
-        String chaincodeIDString = chaincodeParameters.get("id").asText();
-        String chaincodePath = chaincodeParameters.get("sourceLocation").asText();
-        String chaincodeVersion = chaincodeParameters.path("version").asText("0");
-        ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
+        ChaincodeID chaincodeID = getChaincodeID(chaincodeParameters);
 
         List<String> chaincodeInitArguments = new ArrayList<>();
         chaincodeParameters.withArray("initArguments").forEach(element -> chaincodeInitArguments.add(element.asText()));
@@ -388,12 +393,10 @@ public class FabricConfig extends YamlConfig {
         chaincodeParameters.withArray("initArguments").forEach(element -> chaincodeInitArguments.add(element.asText()));
 
         String chaincodePathPrefix = getFileName(chaincodeParameters, "sourceLocationPrefix", "chaincode");
-        String chaincodeIDString = chaincodeParameters.get("id").asText();
-        String chaincodePath = chaincodeParameters.get("sourceLocation").asText();
-        String chaincodeVersion = chaincodeParameters.path("version").asText("0");
         String chaincodeType = chaincodeParameters.path("type").asText("GO_LANG");
 
-        ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
+        ChaincodeID chaincodeID = getChaincodeID(chaincodeParameters);
+        String chaincodeVersion = chaincodeID.getVersion();
 
         InstallProposalRequest installProposalRequest = hfClient.newInstallProposalRequest();
         installProposalRequest.setChaincodeID(chaincodeID);

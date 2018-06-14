@@ -1,5 +1,7 @@
 package com.luxoft.fabric.utils;
 
+import org.hyperledger.fabric.protos.peer.Query;
+import org.hyperledger.fabric.sdk.ChaincodeID;
 
 import java.io.File;
 import java.io.IOException;
@@ -9,6 +11,7 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -83,5 +86,10 @@ public class MiscUtils
         } catch (IOException e) {
             return Collections.emptyList();
         }
+    }
+
+    public static boolean equals(ChaincodeID chaincodeID, Query.ChaincodeInfo chaincodeInfo) {
+        return Objects.equals(chaincodeID.getName(), chaincodeInfo.getName()) &&
+                Objects.equals(chaincodeID.getVersion(), chaincodeInfo.getVersion());
     }
 }
