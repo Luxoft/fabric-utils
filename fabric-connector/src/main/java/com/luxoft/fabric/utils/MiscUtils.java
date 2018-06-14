@@ -1,6 +1,5 @@
 package com.luxoft.fabric.utils;
 
-import com.google.common.collect.Lists;
 
 import java.io.File;
 import java.io.IOException;
@@ -10,6 +9,8 @@ import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 /**
  * Created by osesov on 13.09.17
@@ -46,29 +47,25 @@ public class MiscUtils
      * @see Files#newDirectoryStream(java.nio.file.Path, java.lang.String)
      */
     public static String resolveFile(String fileName, String topDir) {
-        Path path;
-        if (Paths.get(fileName).isAbsolute()) {
-            path = Paths.get(fileName);
-        } else {
-            path = Paths.get(topDir, fileName);
+        File file = new File(fileName);
+        if (!file.isAbsolute()) {
+            file = new File(topDir, fileName);
         }
-
-        if (!Files.exists(path)) {
+        if (!file.exists()) {
             // Trying to resolve file using glob pattern
-            List<Path> paths = getDirectoryList(path.getParent(), path.getFileName().toString());
+            List<File> files = getDirectoryList(file.getParentFile(), file.getName());
 
-            if (paths.size() == 1) {
-                path = paths.get(0);
+            if (files.size() == 1) {
+                file = files.get(0);
 
-            } else if (paths.size() > 1) {
+            } else if (files.size() > 1) {
                 throw new IllegalArgumentException("Found more than 1 file, name: " + fileName + " dir:" + topDir);
 
             } else {
-                throw new IllegalArgumentException("File does not exist: " + path.toUri().getPath());
+                throw new IllegalArgumentException("File does not exist: " + file.getAbsolutePath());
             }
         }
-
-        return path.toUri().getPath();
+        return file.getAbsoluteFile().getAbsolutePath();
     }
 
     /**
@@ -79,9 +76,10 @@ public class MiscUtils
      * @param glob glob
      * @return list of paths
      */
-    public static List<Path> getDirectoryList(Path dir, String glob) {
+    public static List<File> getDirectoryList(File dir, String glob) {
         try {
-            return Lists.newArrayList(Files.newDirectoryStream(dir, glob));
+            return StreamSupport.stream(Files.newDirectoryStream(Paths.get(dir.toURI()), glob).spliterator(), false)
+                    .map(Path::toFile).collect(Collectors.toList());
         } catch (IOException e) {
             return Collections.emptyList();
         }
