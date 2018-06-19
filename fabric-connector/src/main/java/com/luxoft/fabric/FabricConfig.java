@@ -44,9 +44,11 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.spec.InvalidKeySpecException;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
@@ -528,6 +530,60 @@ public class FabricConfig extends YamlConfig {
         }
     }
 
+    private static class TimePair {
+        final TimeUnit timeUnit;
+        final long value;
+
+        TimePair(long value, TimeUnit timeUnit) {
+            this.value = value;
+            this.timeUnit = timeUnit;
+        }
+    };
+
+    private static TimePair parseInterval(String s) {
+        final TimePair[] nsUnits = {
+                new TimePair(1000, TimeUnit.NANOSECONDS),
+                new TimePair(1000, TimeUnit.MICROSECONDS),
+                new TimePair(Long.MAX_VALUE, TimeUnit.MILLISECONDS),
+        };
+
+        final TimePair[] sUnits = {
+                new TimePair(60, TimeUnit.SECONDS),
+                new TimePair(60, TimeUnit.MINUTES),
+                new TimePair(24, TimeUnit.HOURS),
+                new TimePair(Long.MAX_VALUE, TimeUnit.DAYS),
+        };
+
+        final Duration duration = Duration.parse(s);
+        long value;
+        TimeUnit timeUnit = null;
+
+        if (duration.isNegative() || duration.isZero())
+            return null;
+
+        if ((value = duration.getNano()) != 0) {
+            for (TimePair unit : nsUnits) {
+                if (value % unit.value != 0) {
+                    timeUnit = unit.timeUnit;
+                    break;
+                }
+                value /= unit.value;
+            }
+        } else {
+            value = duration.getSeconds();
+
+            for (TimePair unit : sUnits) {
+                if (value % unit.value != 0) {
+                    timeUnit = unit.timeUnit;
+                    break;
+                }
+                value /= unit.value;
+            }
+        }
+
+        return new TimePair(value, timeUnit);
+    }
+
     /**
      * Convert JSON node to Java properties.
      * @param propertiesNode node with properties
@@ -537,10 +593,23 @@ public class FabricConfig extends YamlConfig {
         Properties peerProperties = new Properties();
 
         if (propertiesNode != null) {
-            Iterator<String> fieldNames = propertiesNode.fieldNames();
-            while (fieldNames.hasNext()) {
-                String field = fieldNames.next();
-                peerProperties.setProperty(field, propertiesNode.get(field).asText());
+            Iterator<Map.Entry<String, JsonNode>> fields = propertiesNode.fields();
+            while (fields.hasNext()) {
+                final Map.Entry<String, JsonNode> e = fields.next();
+                final String fieldName = e.getKey();
+                final JsonNode fieldValue = e.getValue();
+                String value = fieldValue.asText();
+
+                switch (fieldName) {
+                    case "idleTimeout":
+                        /** @see Endpoint#addNettyBuilderProps for more info */
+                        final TimePair idleTimeout = parseInterval(value);
+                        peerProperties.put("grpc.NettyChannelBuilderOption.idleTimeout", new Object[]{Long.valueOf(idleTimeout.value), idleTimeout.timeUnit});
+                        break;
+                    default:
+                        peerProperties.setProperty(fieldName, fieldValue.asText());
+                        break;
+                }
             }
         }
         return peerProperties;
