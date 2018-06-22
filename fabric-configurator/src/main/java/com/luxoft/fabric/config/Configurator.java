@@ -5,9 +5,11 @@ import com.luxoft.fabric.utils.NetworkManager;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
+import org.apache.commons.io.FileUtils;
 import org.hyperledger.fabric.sdk.HFClient;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 
+import java.io.File;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -35,6 +37,7 @@ public class Configurator extends NetworkManager {
         public static final Arguments DEPLOY  = new Arguments("deploy");
         public static final Arguments UPGRADE = new Arguments("upgrade");
         public static final Arguments ENROLL  = new Arguments("enroll");
+        public static final Arguments GET_CHANNEL = new Arguments("getchannel");
     }
 
     public static void main(String[] args) throws Exception {
@@ -44,6 +47,8 @@ public class Configurator extends NetworkManager {
 
         OptionSpec<String> name   = parser.accepts("name").withOptionalArg().ofType(String.class);
         OptionSpec<String> config = parser.accepts("config").withOptionalArg().ofType(String.class);
+        OptionSpec<String> dest = parser.accepts("dest").withOptionalArg().ofType(String.class).defaultsTo("output.bin");
+        OptionSpec<String> channel = parser.accepts("channel").withOptionalArg().ofType(String.class);
 
         OptionSet options = parser.parse(args);
         Arguments mode = options.valueOf(type);
@@ -57,6 +62,11 @@ public class Configurator extends NetworkManager {
             cfg.configNetwork(fabricConfig);
         } else if (mode.equals(Arguments.ENROLL)) {
             UserEnroller.run(fabricConfig);
+        } else if (mode.equals(Arguments.GET_CHANNEL)) {
+            String destFilePath = options.valueOf(dest);
+            String channelName = options.valueOf(channel);
+
+            FileUtils.writeByteArrayToFile(new File(destFilePath), cfg.getChannelConfig(fabricConfig, channelName));
         } else {
 
             HFClient hfClient = HFClient.createNewInstance();

@@ -2,6 +2,7 @@ package com.luxoft.fabric.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.FabricConfig;
+import com.luxoft.fabric.FabricConnector;
 import org.hyperledger.fabric.protos.peer.Query;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
@@ -196,6 +197,10 @@ public class NetworkManager {
         }
     }
 
+    public static byte[] getChannelConfig(final FabricConfig fabricConfig, String channelName) throws Exception {
+        FabricConnector fabricConnector = new FabricConnector(fabricConfig, false);
+        return fabricConfig.getChannel(fabricConnector.getHfClient(), channelName).getChannelConfigurationBytes();
+    }
 
     private static void installChaincodes(HFClient hfc, FabricConfig fabricConfig, List<Peer> peers, String chaincodeKey) throws InvalidArgumentException, ProposalException {
         ChaincodeID chaincodeID = fabricConfig.getChaincodeID(chaincodeKey);
