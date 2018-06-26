@@ -2,11 +2,14 @@ package com.luxoft.fabric.utils;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.FabricConfig;
+import org.hyperledger.fabric.protos.peer.Query;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 
 import java.io.File;
-import java.io.IOException;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 /**
@@ -72,8 +75,8 @@ public class NetworkManager {
                 boolean newChannel = false;
                 Channel channel;
                 if (!alreadyInstalled) {
-                        String txFile = fabricConfig.getFileName(channelParameters, "txFile");
-                        ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
+                    String txFile = fabricConfig.getFileName(channelParameters, "txFile");
+                    ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
                     try {
                         byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, hfClient.getUserContext());
                         channel = hfClient.newChannel(channelName, ordererList.get(0), channelConfiguration, channelConfigurationSignature);
@@ -121,9 +124,102 @@ public class NetworkManager {
                         e.printStackTrace();
                     }
                 }
+
             } catch (Exception e) {
                 throw new RuntimeException("Failed to process channel:" + channelName, e);
             }
+        }
+    }
+
+    public void waitChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names, long seconds) throws Exception {
+
+        class WaitContext {
+            private final Set<String> chaincodes = new HashSet<>();
+            private final Set<Peer> peers = new HashSet<>();
+        }
+
+        Map<String, WaitContext> waitContext = new HashMap<>();
+        Iterator<JsonNode> channels = fabricConfig.getChannels();
+        while (channels.hasNext()) {
+            Map.Entry<String, JsonNode> channelObject = channels.next().fields().next();
+
+            String channelName = channelObject.getKey();
+
+            String adminKey = channelObject.getValue().get("admin").asText();
+            final User fabricUser = fabricConfig.getAdmin(adminKey);
+            hfc.setUserContext(fabricUser);
+
+            fabricConfig.getChannel(hfc, channelName, null);
+            final Channel channel = hfc.getChannel(channelName);
+            final WaitContext wc = waitContext.computeIfAbsent(channelName, (k) -> new WaitContext());
+
+            wc.peers.addAll(channel.getPeers());
+
+            for (JsonNode jsonNode : channelObject.getValue().get("chaincodes")) {
+                String chaincodeName = jsonNode.asText();
+                if (!names.isEmpty()) {
+                    if (!names.contains(chaincodeName)) continue;
+                }
+
+                String chaincodeKey = jsonNode.asText();
+                wc.chaincodes.add(chaincodeKey);
+            }
+        }
+
+        Instant start = Instant.now();
+
+        while (true) {
+            for (Iterator<Map.Entry<String, WaitContext>> iterator = waitContext.entrySet().iterator(); iterator.hasNext(); ) {
+                Map.Entry<String, WaitContext> e = iterator.next();
+                final String channelName = e.getKey();
+                final WaitContext wc = e.getValue();
+
+                if (wc.chaincodes.isEmpty()) {
+                    iterator.remove();
+                } else if (!wc.peers.isEmpty()) {
+                    final Channel channel = hfc.getChannel(channelName);
+                    for (Iterator<Peer> peerIterator = wc.peers.iterator(); peerIterator.hasNext(); ) {
+                        final Peer peer = peerIterator.next();
+                        final List<Query.ChaincodeInfo> chaincodeInfoList = channel.queryInstantiatedChaincodes(peer);
+                        final Set<String> s = new HashSet(wc.chaincodes);
+                        chaincodeInfoList.forEach((elem) -> s.remove(elem.getName()));
+                        if (s.isEmpty()) {
+                            peerIterator.remove();
+
+                            System.out.printf("channel: %s, peer %s, chaincodes:\n", channelName, peer.getName());
+                            for (Query.ChaincodeInfo ccinfo : chaincodeInfoList) {
+                                if (wc.chaincodes.contains(ccinfo.getName()))
+                                    System.out.printf("\t%s:%s\n", ccinfo.getName(), ccinfo.getVersion());
+                            }
+                        }
+                    }
+                }
+
+                if (wc.peers.isEmpty())
+                    iterator.remove();
+            }
+
+            if (waitContext.isEmpty())
+                break;
+
+            if (Duration.between(start, Instant.now()).compareTo(Duration.of(seconds, ChronoUnit.SECONDS)) >= 0) {
+                System.err.println("Unable to wait for chaincodes:");
+                for (Map.Entry<String, WaitContext> e : waitContext.entrySet()) {
+                    final String channelName = e.getKey();
+                    final WaitContext wc = e.getValue();
+                    for (Peer peer : wc.peers) {
+                        System.out.printf("channel %s, peer %s: ", channelName, peer.getName());
+
+                        for (String s : wc.chaincodes) {
+                            System.err.printf(" %s", s);
+                        }
+                    }
+
+                    System.err.println();
+                }
+                break;
+            }
+            Thread.sleep(1000);
         }
     }
 
@@ -140,16 +236,15 @@ public class NetworkManager {
             final User fabricUser = fabricConfig.getAdmin(adminKey);
             hfc.setUserContext(fabricUser);
 
-            fabricConfig.getChannel(hfc, channelName);
+            fabricConfig.getChannel(hfc, channelName, null);
+            final Channel channel = hfc.getChannel(channelName);
+            final List<Peer> peers = new ArrayList<>(channel.getPeers());
 
             for (JsonNode jsonNode : channelObject.getValue().get("chaincodes")) {
                 String chaincodeName = jsonNode.asText();
                 if (!names.isEmpty()) {
                     if (!names.contains(chaincodeName)) continue;
                 }
-
-                Channel channel = hfc.getChannel(channelName);
-                List<Peer> peers = new ArrayList<>(channel.getPeers());
 
                 String chaincodeKey = jsonNode.asText();
 
@@ -172,7 +267,7 @@ public class NetworkManager {
             final User fabricUser = fabricConfig.getAdmin(adminKey);
             hfc.setUserContext(fabricUser);
 
-            fabricConfig.getChannel(hfc, channelName);
+            fabricConfig.getChannel(hfc, channelName, null);
 
             for (JsonNode jsonNode : channelObject.getValue().get("chaincodes")) {
                 String chaincodeName = jsonNode.asText();
@@ -189,7 +284,7 @@ public class NetworkManager {
     }
 
 
-    private static void installChaincodes(HFClient hfc, FabricConfig fabricConfig, Set<String> installedChaincodes, List<Peer> peers, String chaincodeKey){
+    private static void installChaincodes(HFClient hfc, FabricConfig fabricConfig, Set<String> installedChaincodes, List<Peer> peers, String chaincodeKey) {
         for (Peer peer : peers) {
             String chaincodeInstallKey = chaincodeKey + "@" + peer.getName();
             if (!installedChaincodes.contains(chaincodeInstallKey)) {

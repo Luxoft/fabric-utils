@@ -35,6 +35,7 @@ public class Configurator extends NetworkManager {
         public static final Arguments DEPLOY  = new Arguments("deploy");
         public static final Arguments UPGRADE = new Arguments("upgrade");
         public static final Arguments ENROLL  = new Arguments("enroll");
+        public static final Arguments WAIT_CHAINCODE = new Arguments("wait-chaincode");
     }
 
     public static void main(String[] args) throws Exception {
@@ -43,6 +44,7 @@ public class Configurator extends NetworkManager {
         OptionSpec<Arguments> type = parser.accepts("type").withRequiredArg().ofType(Arguments.class);
 
         OptionSpec<String> name   = parser.accepts("name").withOptionalArg().ofType(String.class);
+        OptionSpec<Integer> timeout = parser.accepts("timeout").withOptionalArg().ofType(Integer.class).defaultsTo(60);
         OptionSpec<String> config = parser.accepts("config").withOptionalArg().ofType(String.class);
 
         OptionSet options = parser.parse(args);
@@ -70,6 +72,8 @@ public class Configurator extends NetworkManager {
                 cfg.deployChaincodes(hfClient, fabricConfig, names);
             else if (mode.equals(Arguments.UPGRADE))
                 cfg.upgradeChaincodes(hfClient, fabricConfig, names);
+            else if (mode.equals(Arguments.WAIT_CHAINCODE))
+                cfg.waitChaincodes(hfClient, fabricConfig, names, options.valueOf(timeout));
         }
     }
 }
