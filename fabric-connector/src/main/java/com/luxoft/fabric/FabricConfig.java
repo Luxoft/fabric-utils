@@ -270,30 +270,37 @@ public class FabricConfig extends YamlConfig {
         return hfClient.newChannel(channelName, orderer, channelConfiguration, channelConfigurationSignature);
     }
 
-    public void initChannel(HFClient hfClient, String channelName) throws Exception {
-        getChannel(hfClient, channelName);
+    public void initChannel(HFClient hfClient, String channelName, FabricConnector.Options options) throws Exception {
+        getChannel(hfClient, channelName, options);
     }
 
-    public void initChannel(HFClient hfClient, String channelName, User fabricUser) throws Exception {
-        getChannel(hfClient, channelName, fabricUser);
+    public void initChannel(HFClient hfClient, String channelName, User fabricUser, FabricConnector.Options options) throws Exception {
+        getChannel(hfClient, channelName, fabricUser, options);
     }
 
-    public Channel getChannel(HFClient hfClient, String channelName) throws Exception {
+    public Channel getChannel(HFClient hfClient, String channelName, FabricConnector.Options options) throws Exception {
         JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
         String adminKey = channelParameters.get("admin").asText();
         final User fabricUser = getAdmin(adminKey);
-        return getChannel(hfClient, channelName, fabricUser);
+        return getChannel(hfClient, channelName, fabricUser, options);
     }
 
-    public Channel getChannel(HFClient hfClient, String channelName, User fabricUser) throws Exception {
+    public Channel getChannel(HFClient hfClient, String channelName, User fabricUser, FabricConnector.Options options) throws Exception {
         JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
         requireNonNull(fabricUser);
         hfClient.setUserContext(fabricUser);
 
-        String ordererName = channelParameters.get("orderers").get(0).asText();
-        Orderer orderer = getNewOrderer(hfClient, ordererName);
+        Iterator<JsonNode> orderers = channelParameters.path("orderers").iterator();
+        if (!orderers.hasNext())
+            throw new RuntimeException("Orderers list can`t be empty");
+        List<Orderer> ordererList = new ArrayList<>();
+        while (orderers.hasNext()) {
+            String ordererKey = orderers.next().asText();
+            Orderer orderer = getNewOrderer(hfClient, ordererKey);
+            ordererList.add(orderer);
+        }
 
-        Iterator<JsonNode> peers = channelParameters.get("peers").iterator();
+        Iterator<JsonNode> peers = channelParameters.path("peers").iterator();
         if (!peers.hasNext())
             throw new RuntimeException("Peers list can`t be empty");
         List<Peer> peerList = new ArrayList<>();
@@ -303,7 +310,7 @@ public class FabricConfig extends YamlConfig {
             peerList.add(peer);
         }
 
-        Iterator<JsonNode> eventhubs = channelParameters.get("eventhubs").iterator();
+        Iterator<JsonNode> eventhubs = channelParameters.path("eventhubs").iterator();
         List<EventHub> eventhubList = new ArrayList<>();
         while (eventhubs.hasNext()) {
             String eventhubKey = eventhubs.next().asText();
@@ -312,14 +319,41 @@ public class FabricConfig extends YamlConfig {
         }
 
         Channel channel = hfClient.newChannel(channelName);
-        channel.addOrderer(orderer);
-        for (Peer peer : peerList) {
-            channel.addPeer(peer);
+        final EventTracker eventTracker = options != null ? options.eventTracker : null;
+        final Channel.PeerOptions peerOptions = Channel.PeerOptions.createPeerOptions();
+
+        if (eventTracker != null) {
+            eventTracker.configureChannel(channel);
+            final long startBlock = eventTracker.getStartBlock(channel);
+
+            if (startBlock > 0 && startBlock < Long.MAX_VALUE)
+                peerOptions.startEvents(startBlock);
+            else
+                peerOptions.startEventsNewest();
+
+            if (eventTracker.useFilteredBlocks(channel))
+                peerOptions.registerEventsForFilteredBlocks();
+            else
+                peerOptions.registerEventsForBlocks();
         }
+
+        for (Orderer orderer : ordererList) {
+            channel.addOrderer(orderer);
+        }
+
+        for (Peer peer : peerList) {
+            channel.addPeer(peer, peerOptions);
+        }
+
         for (EventHub eventhub : eventhubList) {
             channel.addEventHub(eventhub);
         }
+
         channel.initialize();
+
+        if (eventTracker != null)
+            eventTracker.connectChannel(channel);
+
         return channel;
     }
 

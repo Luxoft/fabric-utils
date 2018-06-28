@@ -19,6 +19,19 @@ import static org.hyperledger.fabric.protos.peer.FabricTransaction.TxValidationC
  */
 public class FabricConnector {
 
+    public static class Options {
+        EventTracker eventTracker;
+
+        public EventTracker getEventTracker() {
+            return eventTracker;
+        }
+
+        public Options setEventTracker(EventTracker eventTracker) {
+            this.eventTracker = eventTracker;
+            return this;
+        }
+    }
+
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
     protected HFClient hfClient;
@@ -27,23 +40,23 @@ public class FabricConnector {
     private String defaultChannelName;
     private int defaultMaxRetries = 3;
 
-    public FabricConnector(FabricConfig fabricConfig, Boolean initChannels) throws Exception {
-        this(null, null, fabricConfig, initChannels);
+    public FabricConnector(FabricConfig fabricConfig, Boolean initChannels, Options options) throws Exception {
+        this(null, null, fabricConfig, initChannels, options);
     }
 
-    public FabricConnector(FabricConfig fabricConfig) throws Exception {
-        this(null, null, fabricConfig);
+    public FabricConnector(FabricConfig fabricConfig, Options options) throws Exception {
+        this(null, null, fabricConfig, options);
     }
 
-    public FabricConnector(User user, FabricConfig fabricConfig) throws Exception {
-        this(user, null, fabricConfig);
+    public FabricConnector(User user, FabricConfig fabricConfig, Options options) throws Exception {
+        this(user, null, fabricConfig, options);
     }
 
-    public FabricConnector(String defaultChannelName, FabricConfig fabricConfig) throws Exception {
-        this(null, defaultChannelName, fabricConfig);
+    public FabricConnector(String defaultChannelName, FabricConfig fabricConfig, Options options) throws Exception {
+        this(null, defaultChannelName, fabricConfig, options);
     }
 
-    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig, Boolean initChannels) throws Exception {
+    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig, Boolean initChannels, Options options) throws Exception {
         this.fabricConfig = fabricConfig;
         this.defaultChannelName = defaultChannelName;
 
@@ -56,17 +69,17 @@ public class FabricConnector {
         else if (hfClient.getUserContext() == null)
             hfClient.setUserContext(fabricConfig.getAdmin(fabricConfig.getAdminsKeys().get(0)));
 
-        if (initChannels) initChannels();
+        if (initChannels) initChannels(options);
     }
 
-    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig) throws Exception {
-        this(user, defaultChannelName, fabricConfig, true);
+    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig, FabricConnector.Options options) throws Exception {
+        this(user, defaultChannelName, fabricConfig, true, options);
     }
 
-    public void initChannels() throws Exception {
+    public void initChannels(Options options) throws Exception {
         for (Iterator<JsonNode> it = fabricConfig.getChannels(); it.hasNext(); ) {
             String channel = it.next().fields().next().getKey();
-            fabricConfig.initChannel(hfClient, channel, hfClient.getUserContext());
+            fabricConfig.initChannel(hfClient, channel, hfClient.getUserContext(), options);
         }
     }
 
