@@ -37,7 +37,7 @@ public class NetworkManager {
                 hfClient.setCryptoSuite(cryptoSuite);
                 hfClient.setUserContext(fabricUser);
 
-                Iterator<JsonNode> orderers = channelParameters.get("orderers").iterator();
+                Iterator<JsonNode> orderers = channelParameters.path("orderers").iterator();
                 if (!orderers.hasNext())
                     throw new RuntimeException("Orderers list can`t be empty");
                 List<Orderer> ordererList = new ArrayList<>();
@@ -47,7 +47,7 @@ public class NetworkManager {
                     ordererList.add(orderer);
                 }
 
-                Iterator<JsonNode> peers = channelParameters.get("peers").iterator();
+                Iterator<JsonNode> peers = channelParameters.path("peers").iterator();
                 if (!peers.hasNext())
                     throw new RuntimeException("Peers list can`t be empty");
                 List<Peer> peerList = new ArrayList<>();
@@ -57,7 +57,7 @@ public class NetworkManager {
                     peerList.add(peer);
                 }
 
-                Iterator<JsonNode> eventhubs = channelParameters.get("eventhubs").iterator();
+                Iterator<JsonNode> eventhubs = channelParameters.path("eventhubs").iterator();
                 List<EventHub> eventhubList = new ArrayList<>();
                 while (eventhubs.hasNext()) {
                     String eventhubKey = eventhubs.next().asText();
