@@ -3,12 +3,11 @@ package com.luxoft.fabric;
 import com.fasterxml.jackson.databind.JsonNode;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.TransactionEventException;
-import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
-import java.util.concurrent.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 
 import static org.hyperledger.fabric.protos.peer.FabricTransaction.TxValidationCode.MVCC_READ_CONFLICT_VALUE;
@@ -47,9 +46,7 @@ public class FabricConnector {
         this.fabricConfig = fabricConfig;
         this.defaultChannelName = defaultChannelName;
 
-        hfClient = HFClient.createNewInstance();
-        CryptoSuite cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
-        hfClient.setCryptoSuite(cryptoSuite);
+        hfClient = FabricConfig.createHFClient();
 
         if (user != null)
             hfClient.setUserContext(user);

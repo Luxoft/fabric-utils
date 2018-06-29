@@ -1,13 +1,14 @@
-package com.luxoft.fabric.utils;
+package com.luxoft.fabric.config;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.FabricConfig;
 import com.luxoft.fabric.FabricConnector;
+import com.luxoft.fabric.utils.MiscUtils;
+import org.hyperledger.fabric.protos.common.Configtx;
 import org.hyperledger.fabric.protos.peer.Query;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
-import org.hyperledger.fabric.sdk.security.CryptoSuite;
 
 import java.io.File;
 import java.io.IOException;
@@ -17,13 +18,13 @@ import java.util.*;
  * Created by ADoroganov on 25.07.2017.
  */
 public class NetworkManager {
+    static private ConfigTxLator configTxLator = new ConfigTxLator();
+
     public static void configNetwork(final FabricConfig fabricConfig) throws IOException {
 
         Iterator<JsonNode> channels = fabricConfig.getChannels();
         if (!channels.hasNext())
             throw new RuntimeException("Need at least one channel to do some work");
-
-        CryptoSuite cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
 
         while (channels.hasNext()) {
             Map.Entry<String, JsonNode> channelObject = channels.next().fields().next();
@@ -33,8 +34,7 @@ public class NetworkManager {
                 String adminKey = channelParameters.get("admin").asText();
                 final User fabricUser = fabricConfig.getAdmin(adminKey);
 
-                HFClient hfClient = HFClient.createNewInstance();
-                hfClient.setCryptoSuite(cryptoSuite);
+                HFClient hfClient = FabricConfig.createHFClient();
                 hfClient.setUserContext(fabricUser);
 
                 Iterator<JsonNode> orderers = channelParameters.get("orderers").iterator();
@@ -197,10 +197,90 @@ public class NetworkManager {
         }
     }
 
-    public static byte[] getChannelConfig(final FabricConfig fabricConfig, String channelName) throws Exception {
+    protected static Channel getChannel(final FabricConfig fabricConfig, String channelName) throws Exception {
         FabricConnector fabricConnector = new FabricConnector(fabricConfig, false);
-        return fabricConfig.getChannel(fabricConnector.getHfClient(), channelName).getChannelConfigurationBytes();
+        return fabricConfig.getChannel(fabricConnector.getHfClient(), channelName);
     }
+
+    public static byte[] getChannelConfig(final FabricConfig fabricConfig, String channelName) throws Exception {
+        return getChannel(fabricConfig, channelName).getChannelConfigurationBytes();
+    }
+
+    public static String getChannelConfigJson(final FabricConfig fabricConfig, String channelName) throws Exception {
+        byte[] bytes = getChannelConfig(fabricConfig, channelName);
+        return configTxLator.protoToJson("common.Config", bytes);
+    }
+
+    public static byte[] signChannelUpdateConfig(final FabricConfig fabricConfig, String channelName, byte[] channelConfig, String userKey) throws Exception {
+        UpdateChannelConfiguration channelConfigurationUpdate = new UpdateChannelConfiguration(channelConfig);
+        User signingUser = fabricConfig.getAdmin(userKey);
+        Channel channel = getChannel(fabricConfig, channelName);
+        return channel.getUpdateChannelConfigurationSignature(channelConfigurationUpdate, signingUser);
+    }
+
+    public static byte[] signChannelUpdateConfig(HFClient hfc, final FabricConfig fabricConfig, byte[] channelConfig, String userKey) throws Exception {
+        UpdateChannelConfiguration channelConfigurationUpdate = new UpdateChannelConfiguration(channelConfig);
+        User signingUser = fabricConfig.getAdmin(userKey);
+        if (hfc.getUserContext() == null)
+            hfc.setUserContext(signingUser);
+        return hfc.getUpdateChannelConfigurationSignature(channelConfigurationUpdate, signingUser);
+    }
+
+    public static byte[] signChannelUpdateConfig(final FabricConfig fabricConfig, Channel channel, byte[] channelConfig, String userKey) throws Exception {
+        UpdateChannelConfiguration channelConfigurationUpdate = new UpdateChannelConfiguration(channelConfig);
+        User signingUser = fabricConfig.getAdmin(userKey);
+        return channel.getUpdateChannelConfigurationSignature(channelConfigurationUpdate, signingUser);
+    }
+
+    public static void setChannelConfig(final FabricConfig fabricConfig, String channelName, byte[] channelConfigurationUpdateBytes, byte[]... signatures) throws Exception {
+        Channel channel = getChannel(fabricConfig, channelName);
+        UpdateChannelConfiguration channelConfigurationUpdate = new UpdateChannelConfiguration(channelConfigurationUpdateBytes);
+        channel.updateChannelConfiguration(channelConfigurationUpdate, signatures);
+    }
+
+    protected static byte[] generateAddCompanyToChannelUpdate(Channel channel, String companyName, byte[] companyConfigGroupBytes) throws Exception {
+        byte[] channelConfigBytes = channel.getChannelConfigurationBytes();
+        Configtx.Config.Builder targetChannelConfig = Configtx.Config.parseFrom(channelConfigBytes).toBuilder();
+        Configtx.ConfigGroup companyConfigGroup = Configtx.ConfigGroup.parseFrom(companyConfigGroupBytes);
+
+        final String targetGroup = "Application";
+        Configtx.ConfigGroup.Builder channelGroup = targetChannelConfig.getChannelGroup().toBuilder();
+        Configtx.ConfigGroup.Builder applicationConfigGroup = channelGroup.getGroupsOrThrow(targetGroup).toBuilder();
+
+        applicationConfigGroup.putGroups(companyName, companyConfigGroup);
+        channelGroup.putGroups(targetGroup, applicationConfigGroup.build());
+        targetChannelConfig.setChannelGroup(channelGroup.build());
+
+        return configTxLator.queryUpdateConfigurationBytes(channel.getName(), channelConfigBytes, targetChannelConfig.build().toByteArray());
+    }
+
+    public static byte[] updateChannel(final FabricConfig fabricConfig, String channelName, String targetChannelConfigJson) throws Exception {
+        Channel channel = getChannel(fabricConfig, channelName);
+        byte[] channelConfigBytes = channel.getChannelConfigurationBytes();
+        byte[] targetChannelConfigBytes = configTxLator.jsonToProtoBytes("common.Config", targetChannelConfigJson);
+        return configTxLator.queryUpdateConfigurationBytes(channel.getName(), channelConfigBytes, targetChannelConfigBytes);
+    }
+
+    public static byte[] addCompanyToChannel(final FabricConfig fabricConfig, String channelName, String companyName, String companyConfigGroupJson) throws Exception {
+        Channel channel = getChannel(fabricConfig, channelName);
+        byte[] companyConfigGroupBytes = configTxLator.jsonToProtoBytes("common.ConfigGroup", companyConfigGroupJson);
+        return generateAddCompanyToChannelUpdate(channel, companyName, companyConfigGroupBytes);
+    }
+
+//    public static void addCompanyToChannel(final FabricConfig fabricConfig, String channelName, String companyName, String companyConfigGroupJson) throws Exception {
+//        Channel channel = getChannel(fabricConfig, channelName);
+//        byte[] companyConfigGroupBytes = configTxLator.jsonToProtoBytes("common.ConfigGroup", companyConfigGroupJson);
+//        addCompanyToChannel(fabricConfig, channel, companyName, companyConfigGroupBytes);
+//    }
+//
+//    protected static void addCompanyToChannel(final FabricConfig fabricConfig, Channel channel, String companyName, byte[] companyConfigGroupBytes) throws Exception {
+//        byte[] updateConfigurationBytes = generateAddCompanyToChannelUpdate(channel, companyName, companyConfigGroupBytes);
+//        UpdateChannelConfiguration channelConfigurationUpdate = new UpdateChannelConfiguration(updateConfigurationBytes);
+//
+//        String channelAdminKey = fabricConfig.getChannelDetails(channel.getName()).get("admin").asText();
+//        byte[] channelConfigurationSignature = signChannelUpdateConfig(fabricConfig, channel, updateConfigurationBytes, channelAdminKey);
+//        channel.updateChannelConfiguration(channelConfigurationUpdate, channelConfigurationSignature);
+//    }
 
     private static void installChaincodes(HFClient hfc, FabricConfig fabricConfig, List<Peer> peers, String chaincodeKey) throws InvalidArgumentException, ProposalException {
         ChaincodeID chaincodeID = fabricConfig.getChaincodeID(chaincodeKey);

@@ -1,6 +1,6 @@
 package com.luxoft.fabric;
 
-import com.luxoft.fabric.utils.NetworkManager;
+import com.luxoft.fabric.config.NetworkManager;
 import org.apache.commons.io.IOUtils;
 import org.hyperledger.fabric.sdk.BlockEvent;
 import org.junit.AfterClass;

@@ -28,6 +28,7 @@ import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.ChaincodeEndorsementPolicyParseException;
+import org.hyperledger.fabric.sdk.exception.CryptoException;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
@@ -77,6 +78,13 @@ public class FabricConfig extends YamlConfig {
             return channels.elements();
         else
             return Collections.emptyIterator();
+    }
+
+    public static HFClient createHFClient() throws CryptoException, InvalidArgumentException {
+        CryptoSuite cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
+        HFClient hfClient = HFClient.createNewInstance();
+        hfClient.setCryptoSuite(cryptoSuite);
+        return hfClient;
     }
 
     public JsonNode getChannelDetails(String key) {
