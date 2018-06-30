@@ -244,7 +244,7 @@ public class OrderingEventTracker implements EventTracker {
                 @Override
                 public boolean hasNext() {
                     if (hasNext)
-                        return hasNext;
+                        return true;
 
                     while (true) {
                         if (eventIterator.hasNext()) {
@@ -263,7 +263,7 @@ public class OrderingEventTracker implements EventTracker {
 
                 @Override
                 public ChaincodeEvent next() {
-                    if (hasNext) {
+                    if (hasNext()) {
                         hasNext = false;
                         return next;
                     }
