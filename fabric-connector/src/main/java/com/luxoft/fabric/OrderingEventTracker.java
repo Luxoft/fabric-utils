@@ -413,12 +413,15 @@ public class OrderingEventTracker implements EventTracker {
 
         private synchronized void processNextBlock() {
             BlockData blockData = blockInfoMap.get(nextBlockNumber);
+
             if (blockData == null) {
                 scheduleNextBlockFetching();
             } else if (blockData.isFilteredBlock()) {
                 blockData = transformFilteredBlock(blockData.getBlockInfo());
                 blockInfoMap.put(nextBlockNumber, blockData);
-            } else if (blockData instanceof EventListWrapper && !blockData.isComplete()) {
+            }
+
+            if (blockData == null || !blockData.isComplete()) {
                 scheduleNextBlockFetching();
             }
 
@@ -512,24 +515,19 @@ public class OrderingEventTracker implements EventTracker {
 
         }
 
-        private synchronized boolean needFetching(long blockNumber) {
-            if (blockNumber != nextBlockNumber)
-                return false;
-
-            final BlockData blockData = blockInfoMap.get(blockNumber);
-            return blockData == null || !blockData.isComplete();
-        }
-
         private void fetchBlock(long blockNumber) throws FabricQueryException {
-            if (!needFetching(blockNumber))
-                return;
+            final BlockData blockData;
+
+            synchronized (this) {
+                if (blockNumber != nextBlockNumber)
+                    return;
+
+                blockData = blockInfoMap.get(blockNumber);
+                if (blockData != null && blockData.isComplete())
+                    return;
+            }
 
             logger.info("Fetch block {}", blockNumber);
-
-            final BlockData blockData;
-            synchronized (this) {
-                blockData = blockInfoMap.get(blockNumber);
-            }
 
             blockData.fetchData();
             if (blockData.isComplete())
@@ -581,7 +579,6 @@ public class OrderingEventTracker implements EventTracker {
             }
 
             blockData.setComplete();
-            addBlockData(blockData);
         }
 
         private BlockData transformFilteredBlock(BlockInfo filteredBlock) {
