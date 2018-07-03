@@ -10,6 +10,7 @@ import org.hyperledger.fabric.sdk.exception.ProposalException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.*;
@@ -57,8 +58,9 @@ import java.util.regex.Pattern;
  */
 public class OrderingEventTracker implements EventTracker {
 
-    @FunctionalInterface
     public interface EventListener<T> {
+        CompletableFuture<Boolean> filter(ChaincodeEvent chaincodeEvent);
+
         CompletableFuture onEvent(ChaincodeEvent chaincodeEvent, T eventData);
     }
 
@@ -87,7 +89,7 @@ public class OrderingEventTracker implements EventTracker {
 
     private ScheduledExecutorService executorService = Executors.newScheduledThreadPool(1);
     private final Persister persister;
-    private CompletableFuture enableEventsDelivery = new CompletableFuture();
+    private CompletableFuture<Void> enableEventsDelivery = new CompletableFuture<>();
     private Map<Channel, ChannelTracker> channelStateMap = new HashMap<>();
     private final List<EventListenerInfo> eventsWaiting = new CopyOnWriteArrayList<>();
     private CountDownLatch initialization = new CountDownLatch(1);
@@ -95,44 +97,47 @@ public class OrderingEventTracker implements EventTracker {
     // TODO: when startblock is too far in the past, should skip the gap?
     // TODO: when startBlock is in the future (due to backup restore), revert state?
 
-    public interface BlockData {
-        String getContentType();
+    class EventSubscription {
+        final WeakReference<EventListenerInfo> listenerInfo;
+        final String transactionId;
+        final int eventIndex;
+        final boolean needFetching;
 
-        int getPriority();
-
-        long getBlockNumber();
-
-        Iterator<ChaincodeEvent> getBlockEvents();
-
-        boolean isFilteredBlock();
-
-        BlockInfo getBlockInfo();
-
-        // fetch control
-        boolean isComplete();
-
-        void fetchData() throws FabricQueryException;
+        EventSubscription(EventListenerInfo listenerInfo, String transactionId, int eventIndex, boolean needFetching) {
+            this.listenerInfo = new WeakReference<>(listenerInfo);
+            this.transactionId = transactionId;
+            this.eventIndex = eventIndex;
+            this.needFetching = needFetching;
+        }
     }
 
-    private class BlockInfoWrapper implements BlockData {
-        private BlockInfo blockInfo;
-        private final Channel channel;
-        private final long blockNumber;
+    class EventSubscriptionList {
+        final List<EventSubscription> subscriptions = new CopyOnWriteArrayList<>();
+        Boolean needsFetching = false;
+    }
 
-        private BlockInfoWrapper(BlockInfo blockInfo) {
+    public class BlockData {
+        private BlockInfo blockInfo = null;
+        private long blockNumber;
+        private EventSubscriptionList eventSubscriptionList = null;
+        private Map<String, List<ChaincodeEvent>> txList = new HashMap<>();
+        private Set<String> fetchQueue = new HashSet<>();
+        private CompletableFuture<Void> processing = null;
+
+        BlockData(BlockInfo blockInfo) {
             this.blockInfo = blockInfo;
             this.blockNumber = blockInfo.getBlockNumber();
-            this.channel = null;
         }
 
-        private BlockInfoWrapper(Channel channel, long blockNumber) {
-            this.blockInfo = null;
-            this.channel = channel;
+        BlockData(long blockNumber) {
             this.blockNumber = blockNumber;
         }
 
-        @Override
-        public String getContentType() {
+        long getBlockNumber() {
+            return blockNumber;
+        }
+
+        String getContentType() {
             if (blockInfo == null)
                 return "incomplete";
             else if (blockInfo.isFiltered())
@@ -141,144 +146,13 @@ public class OrderingEventTracker implements EventTracker {
                 return "full";
         }
 
-        @Override
-        public int getPriority() {
+        int getPriority() {
             if (blockInfo == null)
                 return 0;
             else if (blockInfo.isFiltered())
                 return 1;
             else
                 return 2;
-        }
-
-        @Override
-        public long getBlockNumber() {
-            return blockNumber;
-        }
-
-        @Override
-        public boolean isFilteredBlock() {
-            return blockInfo != null && blockInfo.isFiltered();
-        }
-
-        @Override
-        public boolean isComplete() {
-            return blockInfo != null;
-        }
-
-        @Override
-        public void fetchData() throws FabricQueryException {
-            if (blockInfo == null)
-                blockInfo = FabricQueryException.withGuard(()->channel.queryBlockByNumber(blockNumber));
-        }
-
-        @Override
-        public BlockInfo getBlockInfo() {
-            return blockInfo;
-        }
-
-        @Override
-        public Iterator<ChaincodeEvent> getBlockEvents() {
-            return FabricHelpers.getBlockEvents(blockInfo);
-        }
-    }
-
-    private class EventListWrapper implements BlockData {
-        private final long blockNumber;
-        private boolean isComplete = false;
-        private final LinkedHashMap<String, List<ChaincodeEvent>> txList;
-        private final FabricQueryException.Consumer<EventListWrapper> processor;
-
-        private EventListWrapper(long blockNumber,
-                                 LinkedHashMap<String, List<ChaincodeEvent>> txList,
-                                 FabricQueryException.Consumer<EventListWrapper> processor) {
-            this.blockNumber = blockNumber;
-            this.txList = txList;
-            this.processor = processor;
-        }
-
-        @Override
-        public String getContentType() {
-            return "event list";
-        }
-
-        @Override
-        public int getPriority() {
-            return 3;
-        }
-
-        @Override
-        public long getBlockNumber() {
-            return blockNumber;
-        }
-
-        @Override
-        public boolean isFilteredBlock() {
-            return false;
-        }
-
-        @Override
-        public boolean isComplete() {
-            return this.isComplete;
-        }
-
-        @Override
-        public void fetchData() throws FabricQueryException {
-            processor.apply(this);
-        }
-
-        @Override
-        public BlockInfo getBlockInfo() {
-            return null;
-        }
-
-        @Override
-        public Iterator<ChaincodeEvent> getBlockEvents() {
-            return new Iterator<ChaincodeEvent>() {
-                boolean hasNext = false;
-                ChaincodeEvent next = null;
-
-                final Iterator<List<ChaincodeEvent>> txIterator = txList.values().iterator();
-                Iterator<ChaincodeEvent> eventIterator = Collections.emptyIterator();
-
-                @Override
-                public boolean hasNext() {
-                    if (hasNext)
-                        return true;
-
-                    while (true) {
-                        if (eventIterator.hasNext()) {
-                            hasNext = true;
-                            next = eventIterator.next();
-                            return true;
-                        }
-                        if (txIterator.hasNext()) {
-                            final List<ChaincodeEvent> nextTx = txIterator.next();
-                            eventIterator = nextTx.iterator();
-                        } else
-                            return false;
-                    }
-
-                }
-
-                @Override
-                public ChaincodeEvent next() {
-                    if (hasNext()) {
-                        hasNext = false;
-                        return next;
-                    }
-                    throw new NoSuchElementException();
-                }
-
-                @Override
-                public void remove() {
-                    eventIterator.remove();
-                }
-            };
-        }
-
-        public void setComplete() {
-            this.isComplete = true;
         }
     }
 
@@ -319,17 +193,17 @@ public class OrderingEventTracker implements EventTracker {
             }
 
             if (nextBlockNumber != maxAvailBlockNumber)
-                blockInfoMap.put(maxAvailBlockNumber, new BlockInfoWrapper(channel, maxAvailBlockNumber));
+                blockInfoMap.put(maxAvailBlockNumber, new BlockData(maxAvailBlockNumber));
 
             initialization.countDown();
             scheduleNextBlockFetching();
         }
 
-        public void addBlock(BlockInfo blockInfo) {
-            addBlockData(new BlockInfoWrapper(blockInfo));
+        private void addBlock(BlockInfo blockInfo) {
+            addBlockData(new BlockData(blockInfo));
         }
 
-        public synchronized void addBlockData(BlockData blockData) {
+        private synchronized void addBlockData(BlockData blockData) {
             while (true) {
                 try {
                     initialization.await();
@@ -390,44 +264,152 @@ public class OrderingEventTracker implements EventTracker {
             switch (fetchPolicy) {
                 case ERROR:
                     setFetchPolicyLk(FetchPolicy.DELAY);
-                    executorService.schedule(()->executeAction(action), errorBlockMillis, TimeUnit.MILLISECONDS);
+                    executorService.schedule(() -> executeAction(action), errorBlockMillis, TimeUnit.MILLISECONDS);
                     break;
 
                 case SLEEP:
                     setFetchPolicyLk(FetchPolicy.DELAY);
-                    executorService.schedule(()->executeAction(action), refetchBlockMillis, TimeUnit.MILLISECONDS);
+                    executorService.schedule(() -> executeAction(action), refetchBlockMillis, TimeUnit.MILLISECONDS);
                     break;
 
                 case DELAY:
                     break;
 
                 case IMMEDIATE:
-                    executorService.submit(()->executeAction(action));
+                    executorService.submit(() -> executeAction(action));
                     break;
             }
         }
 
         private synchronized void scheduleNextBlockFetching() {
-            scheduleAction(()-> fetchBlock(nextBlockNumber));
+            scheduleAction(() -> fetchBlock(nextBlockNumber));
+        }
+
+        private CompletableFuture<EventSubscriptionList> filterSubscriptions(BlockData blockData) {
+            CompletableFuture<EventSubscriptionList> result = CompletableFuture.completedFuture(new EventSubscriptionList());
+            final Iterator<BlockInfo.TransactionEnvelopeInfo> txIterator = FabricHelpers.getBlockTransactions(blockData.blockInfo);
+
+            while (txIterator.hasNext()) {
+                final BlockInfo.TransactionEnvelopeInfo transactionEnvelopeInfo = txIterator.next();
+                final List<ChaincodeEvent> transactionEvents = FabricHelpers.getTransactionEvents(transactionEnvelopeInfo);
+
+                final String transactionID = transactionEnvelopeInfo.getTransactionID();
+
+                if (!transactionEnvelopeInfo.isValid())
+                    continue;
+
+                for (ListIterator<ChaincodeEvent> iterator = transactionEvents.listIterator(); iterator.hasNext(); ) {
+                    final int eventIndex = iterator.nextIndex();
+                    final ChaincodeEvent chaincodeEvent = iterator.next();
+
+                    for (EventListenerInfo e : eventsWaiting) {
+                        final String chaincodeId = chaincodeEvent.getChaincodeId();
+                        final String eventName = chaincodeEvent.getEventName();
+                        if (e.chaincodePattern.matcher(chaincodeId).matches()
+                                && e.eventNamePattern.matcher(eventName).matches()) {
+
+                            CompletableFuture<Boolean> filter = e.listener.filter(chaincodeEvent);
+
+                            if (filter == null) {
+                                filter = CompletableFuture.completedFuture(Boolean.TRUE);
+                            } else {
+                                filter = filter.exceptionally((t) -> {
+                                    logger.warn("Filtering failed on {}, exclude", chaincodeEvent, t);
+                                    return Boolean.FALSE;
+                                });
+                            }
+
+                            result = result.thenCombineAsync(filter, (subs, currRelate) -> {
+                                if (Boolean.TRUE.equals(currRelate)) {
+                                    boolean needsFetching = false;
+                                    if (!Empty.class.isAssignableFrom(e.paramClass)
+                                            && e.paramClass != Void.class) {
+                                        needsFetching = blockData.blockInfo.isFiltered();
+                                    }
+                                    subs.needsFetching |= needsFetching;
+                                    subs.subscriptions.add(new EventSubscription(e, transactionID, eventIndex, needsFetching));
+                                }
+
+                                return subs;
+                            }, executorService);
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        private void queryBlockEvents(CompletableFuture<Void> completableFuture,
+                                      BlockData blockData) {
+            for (Iterator<String> iterator = blockData.fetchQueue.iterator(); iterator.hasNext(); ) {
+                String s = iterator.next();
+                List<ChaincodeEvent> chaincodeEvents;
+                try {
+                    chaincodeEvents = FabricQueryException.withGuard(() -> FabricHelpers.queryEventsByTransactionID(channel, s));
+                } catch (FabricQueryException e) {
+                    // TODO
+                    logger.warn("Exception while queriying data", e);
+                    executorService.schedule(() -> queryBlockEvents(completableFuture, blockData),
+                            errorBlockMillis, TimeUnit.MILLISECONDS);
+                    return;
+                } catch (Exception e) {
+                    logger.warn("Ignore fetch error", e);
+                    chaincodeEvents = null;
+                }
+
+                if (chaincodeEvents != null && !chaincodeEvents.isEmpty())
+                    blockData.txList.put(s, chaincodeEvents);
+                iterator.remove();
+            }
+
+            completableFuture.complete(null);
+        }
+
+        private CompletableFuture<Void> fetchTransactions(BlockData blockData) {
+            blockData.eventSubscriptionList.subscriptions.forEach((e) -> {
+                if (e.needFetching)
+                    blockData.fetchQueue.add(e.transactionId);
+            });
+
+            final CompletableFuture<Void> completableFuture = new CompletableFuture<>();
+            CompletableFuture.runAsync(() -> queryBlockEvents(completableFuture, blockData));
+            return completableFuture;
         }
 
         private synchronized void processNextBlock() {
-            BlockData blockData = blockInfoMap.get(nextBlockNumber);
+            final BlockData blockData = blockInfoMap.get(nextBlockNumber);
 
-            if (blockData == null) {
+            if (blockData == null || blockData.blockInfo == null) {
                 scheduleNextBlockFetching();
-            } else if (blockData.isFilteredBlock()) {
-                blockData = transformFilteredBlock(blockData.getBlockInfo());
-                blockInfoMap.put(nextBlockNumber, blockData);
+                return;
             }
 
-            if (blockData == null || !blockData.isComplete()) {
-                scheduleNextBlockFetching();
-            }
+            if (blockData.processing != null)
+                return;
 
-            // process full or event block
-            if (blockData != null && blockData.isComplete())
-                processBlock(blockData);
+            blockData.processing =
+                    // 1) filter subscriptions
+                    filterSubscriptions(blockData)
+                            .thenApplyAsync((eventSubscriptionList) -> {
+                                blockData.eventSubscriptionList = eventSubscriptionList;
+                                return null;
+                            }, executorService)
+                            // 2) fetch transactions if necessary
+                            .thenComposeAsync((x) -> {
+                                if (blockData.eventSubscriptionList.needsFetching)
+                                    return fetchTransactions(blockData);
+                                else
+                                    return CompletableFuture.completedFuture(null);
+                            }, executorService)
+                            // 3) Run processing
+                            .thenComposeAsync((x) -> {
+                                return processBlock(blockData);
+                            }, executorService)
+                            // 4) Go to the next block
+                            .handleAsync((r, t) -> {
+                                blockCompleted(blockData.blockNumber);
+                                return null;
+                            }, executorService);
         }
 
         private void saveStartBlock(long blockNumber) {
@@ -453,8 +435,20 @@ public class OrderingEventTracker implements EventTracker {
             processNextBlock();
         }
 
-        private synchronized void processBlock(BlockData blockInfo) {
-            CompletableFuture blockProcessor;
+        private synchronized CompletableFuture<Void> processBlock(BlockData blockInfo) {
+            final EventSubscriptionList eventSubscriptionList = blockInfo.eventSubscriptionList;
+            final Map<String, List<ChaincodeEvent>> txList = blockInfo.txList;
+            final long blockNumber = blockInfo.blockNumber;
+
+            blockInfo.blockInfo.getEnvelopeInfos().forEach((e) -> {
+                if (e.isValid() && e instanceof BlockInfo.TransactionEnvelopeInfo) {
+                    final BlockInfo.TransactionEnvelopeInfo txEnvelopeInfo = (BlockInfo.TransactionEnvelopeInfo) e;
+                    txList.computeIfAbsent(e.getTransactionID(),
+                            (k) -> FabricHelpers.getTransactionEvents(txEnvelopeInfo));
+                }
+            });
+
+            CompletableFuture<Void> blockProcessor;
 
             if (enableEventsDelivery != null) {
                 if (!enableEventsDelivery.isDone())
@@ -463,59 +457,53 @@ public class OrderingEventTracker implements EventTracker {
             } else
                 blockProcessor = CompletableFuture.completedFuture(null);
 
-            final long blockNumber = blockInfo.getBlockNumber();
+            for (EventSubscription s : eventSubscriptionList.subscriptions) {
 
-            final Iterator<ChaincodeEvent> eventIterator = blockInfo.getBlockEvents();
-            while (eventIterator.hasNext()) {
-                ChaincodeEvent event = eventIterator.next();
+                final String transactionID = s.transactionId;
+                final List<ChaincodeEvent> chaincodeEvents = txList.get(transactionID);
 
-                for (EventListenerInfo listenerInfo : eventsWaiting) {
-                    final String chaincodeId = event.getChaincodeId();
-                    final String eventName = event.getEventName();
-                    if (listenerInfo.chaincodePattern.matcher(chaincodeId).matches()
-                            && listenerInfo.eventNamePattern.matcher(eventName).matches()) {
+                final EventListenerInfo listenerInfo = s.listenerInfo.get();
+                if (listenerInfo != null && s.eventIndex < chaincodeEvents.size()) {
+                    final ChaincodeEvent chaincodeEvent = chaincodeEvents.get(s.eventIndex);
+                    final String chaincodeId = chaincodeEvent.getChaincodeId();
+                    final String eventName = chaincodeEvent.getEventName();
 
-                        try {
-                            final Method newBuilder = listenerInfo.paramClass.getMethod("newBuilder");
-                            final Message.Builder builder = (Message.Builder) newBuilder.invoke(null);
-                            final Message message;
+                    try {
+                        final Method newBuilder = listenerInfo.paramClass.getMethod("newBuilder");
+                        final Message.Builder builder = (Message.Builder) newBuilder.invoke(null);
+                        final Message message;
 
-                            if (Empty.class.isAssignableFrom(listenerInfo.paramClass))
-                                message = Empty.getDefaultInstance();
-                            else if (Void.class.isAssignableFrom(listenerInfo.paramClass))
-                                message = null;
-                            else
-                                message = builder.mergeFrom(event.getPayload()).build();
+                        if (Empty.class.isAssignableFrom(listenerInfo.paramClass))
+                            message = Empty.getDefaultInstance();
+                        else if (Void.class.isAssignableFrom(listenerInfo.paramClass))
+                            message = null;
+                        else
+                            message = builder.mergeFrom(chaincodeEvent.getPayload()).build();
 
-                            blockProcessor = blockProcessor
-                                    .thenCompose((r) -> {
-                                        logger.info("Begin event handling(block={}, chaincode={}, name={}, data={}, txid={})", blockNumber, chaincodeId, eventName, message, event.getTxId());
-                                        return listenerInfo.listener.onEvent(event, message);
-                                    })
-                                    .handle((r, t) -> {
-                                        if (t != null)
-                                            logger.warn("Event handling failed(block={}, chaincode={}, name={}, data={}, txid={})", blockNumber, chaincodeId, eventName, message, event.getTxId(), t);
-                                        else
-                                            logger.info("Event handling succeeded (block={}, chaincode={}, name={}, data={}, txid={}) -> ({})", blockNumber, chaincodeId, eventName, message, event.getTxId(), r);
-                                        return null;
-                                    });
+                        blockProcessor = blockProcessor
+                                .thenCompose((r) -> {
+                                    logger.info("Begin event handling(block={}, chaincode={}, name={}, data={}, txid={})", blockNumber, chaincodeId, eventName, message, transactionID);
+                                    return listenerInfo.listener.onEvent(chaincodeEvent, message);
+                                })
+                                .handle((r, t) -> {
+                                    if (t != null)
+                                        logger.warn("Event handling failed(block={}, chaincode={}, name={}, data={}, txid={})", blockNumber, chaincodeId, eventName, message, transactionID, t);
+                                    else
+                                        logger.info("Event handling succeeded (block={}, chaincode={}, name={}, data={}, txid={}) -> ({})", blockNumber, chaincodeId, eventName, message, transactionID, r);
+                                    return null;
+                                });
 
-                        } catch (Exception e) {
-                            logger.warn("Prepare Event Handling failed(block={}, chaincode={}, name={}, txid={}): ", blockNumber, chaincodeId, eventName, event.getTxId(), e);
-                        }
+                    } catch (Exception e) {
+                        logger.warn("Prepare Event Handling failed(block={}, chaincode={}, name={}, txid={}): ", blockNumber, chaincodeId, eventName, transactionID, e);
                     }
                 }
             }
 
-            blockProcessor.handle((r, t) -> {
-                // go to process next block
-                blockCompleted(blockNumber);
-                return null;
-            });
-
+            return blockProcessor;
         }
 
         private void fetchBlock(long blockNumber) throws FabricQueryException {
+
             final BlockData blockData;
 
             synchronized (this) {
@@ -523,15 +511,13 @@ public class OrderingEventTracker implements EventTracker {
                     return;
 
                 blockData = blockInfoMap.get(blockNumber);
-                if (blockData != null && blockData.isComplete())
+                if (blockData != null && blockData.blockInfo != null)
                     return;
             }
 
             logger.info("Fetch block {}", blockNumber);
-
-            blockData.fetchData();
-            if (blockData.isComplete())
-                addBlockData(blockData);
+            final BlockInfo blockInfo = FabricQueryException.withGuard(() -> channel.queryBlockByNumber(blockNumber));
+            addBlock(blockInfo);
         }
 
         private boolean filterTransactionEvents(List<ChaincodeEvent> transactionEvents, boolean isFilteredData) {
@@ -554,54 +540,6 @@ public class OrderingEventTracker implements EventTracker {
                 }
             }
             return needFetching;
-        }
-
-        private void fetchFilteredBlockEvents(EventListWrapper blockData) throws FabricQueryException {
-            final LinkedHashMap<String, List<ChaincodeEvent>> txList = blockData.txList;
-            for (Iterator<Map.Entry<String, List<ChaincodeEvent>>> iterator = txList.entrySet().iterator(); iterator.hasNext(); ) {
-                Map.Entry<String, List<ChaincodeEvent>> entry = iterator.next();
-                if (entry.getValue() == null) {
-                    try {
-                        final List<ChaincodeEvent> chaincodeEvents = TxUtil.queryEventsByTransactionID(channel, entry.getKey());
-                        filterTransactionEvents(chaincodeEvents, false);
-                        if (chaincodeEvents.isEmpty())
-                            iterator.remove();
-                        else
-                            entry.setValue(chaincodeEvents);
-                    } catch (FabricQueryException e) {
-                        logger.warn("Unable to query events, repeat", e);
-                        throw e;
-                    } catch (Exception ex) {
-                        logger.warn("Unable to parse events, ignore", ex);
-                        entry.setValue(Collections.EMPTY_LIST);
-                    }
-                }
-            }
-
-            blockData.setComplete();
-        }
-
-        private BlockData transformFilteredBlock(BlockInfo filteredBlock) {
-            final Iterator<BlockInfo.TransactionEnvelopeInfo> txIterator = FabricHelpers.getBlockTransactions(filteredBlock);
-            final LinkedHashMap<String, List<ChaincodeEvent>> txList = new LinkedHashMap<>();
-            boolean needsFetching = false;
-
-            while (txIterator.hasNext()) {
-                final BlockInfo.TransactionEnvelopeInfo transactionEnvelopeInfo = txIterator.next();
-                List<ChaincodeEvent> transactionEvents = FabricHelpers.getTransactionEvents(transactionEnvelopeInfo);
-
-                if (filterTransactionEvents(transactionEvents, true)) {
-                    txList.put(transactionEnvelopeInfo.getTransactionID(), null);
-                    needsFetching = true;
-                } else if (!transactionEvents.isEmpty()) {
-                    txList.put(transactionEnvelopeInfo.getTransactionID(), transactionEvents);
-                }
-            }
-
-            final EventListWrapper blockData = new EventListWrapper(filteredBlock.getBlockNumber(), txList, this::fetchFilteredBlockEvents);
-            if (!needsFetching)
-                blockData.setComplete();
-            return blockData;
         }
     }
 

@@ -14,10 +14,10 @@ public class TxUtil {
     public static List<ChaincodeEvent> queryEventsByTransactionID(Channel channel, String transactionID) throws InvalidArgumentException, ProposalException, InvalidProtocolBufferException, FabricQueryException {
         final TransactionInfo transactionInfo = FabricQueryException.withGuard(()->
                 channel.queryTransactionByID(transactionID));
-        return queryEventsByTransactionInfo(transactionInfo);
+        return getEventsByTransactionInfo(transactionInfo);
     }
 
-    public static List<ChaincodeEvent> queryEventsByTransactionInfo(TransactionInfo transactionInfo) throws InvalidProtocolBufferException {
+    public static List<ChaincodeEvent> getEventsByTransactionInfo(TransactionInfo transactionInfo) throws InvalidProtocolBufferException {
         final List<ChaincodeEvent> result = new ArrayList<>();
         final Common.Envelope envelope = transactionInfo.getEnvelope();
         final Common.Payload payload = Common.Payload.parseFrom(envelope.getPayload());
