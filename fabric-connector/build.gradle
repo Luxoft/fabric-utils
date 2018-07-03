@@ -9,15 +9,43 @@ repositories {
     mavenCentral()
 }
 
+//configurations {
+//    compile {
+//        exclude module: 'grpc-netty'
+//        exclude module: 'grpc-protobuf'
+//        exclude module: 'grpc-stub'
+//        exclude group: 'io.grpc', module: 'grpc-netty'
+//        exclude group: 'io.netty', module: 'netty-codec-http2'
+//    }
+//}
+
 dependencies {
-    compile(group: 'org.hyperledger.fabric-sdk-java', name: 'fabric-sdk-java', version: '1.1.0') {
-        exclude(group: 'junit', module: 'junit')
-        // fabric-sdk-java has been upgraded to snakeyaml 1.20, while jackson-dataformat-yaml uses 1.18
-        // exclude(group: 'org.yaml', module: 'snakeyaml')
+    [ null, 'sources', 'javadoc' ].collect {
+        compile(group: 'org.hyperledger.fabric-sdk-java', name: 'fabric-sdk-java', version: '1.1.0', classifier: it) {
+
+            //////////////////////////////////////////////////////////////////
+            // WORKAROUND: turn to grpc 1.10.1
+            // fabric-java-sdk uses grpc 1.11.0, which refers netty 4.1.23 with bug:
+            // https://github.com/netty/netty/issues/7877
+            // fixed in 4.1.24: https://github.com/netty/netty/commit/3ec29455af9642f6b20d7a309d3b6fb19c49b819
+            //
+            // This bug causes infinite loop in netty. Use grpc 1.10.1 as suggested here
+            // https://github.com/grpc/grpc-java/issues/4495
+            //
+            exclude group: 'io.grpc', module: 'grpc-netty'
+            exclude group: 'io.grpc', module: 'grpc-protobuf'
+            exclude group: 'io.grpc', module: 'grpc-stub'
+            exclude group: 'io.netty', module: 'netty-codec-http2'
+            exclude group: 'io.netty', module: 'netty-tcnative-boringssl-static'
+        }
     }
 
-    compile group: 'org.hyperledger.fabric-sdk-java', name: 'fabric-sdk-java', version: '1.1.0', classifier: 'sources'
-    compile group: 'org.hyperledger.fabric-sdk-java', name: 'fabric-sdk-java', version: '1.1.0', classifier: 'javadoc'
+    // WORKAROUND: turn to grpc 1.10.1
+    compile ('io.grpc:grpc-netty:1.10.1')
+    compile ('io.grpc:grpc-protobuf:1.10.1')
+    compile ('io.grpc:grpc-stub:1.10.1')
+    compile ('io.netty:netty-tcnative-boringssl-static:2.0.8.Final')
+    // END OF WORKAROUND
 
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.8.9'
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-databind', version: '2.8.9'
@@ -29,15 +57,4 @@ dependencies {
     compile group: 'ch.qos.logback', name: 'logback-classic', version: '1.2.3'
 
     testCompile group: 'junit', name: 'junit', version: '4.12'
-
-    //////////////////////////////////////////////////////////////////
-    // fabric-java-sdk uses grpc 1.11.0, which uses netty with bug:
-    // https://github.com/netty/netty/commit/3ec29455af9642f6b20d7a309d3b6fb19c49b819
-    // use grpc 1.10.1 as suggested here
-    // https://github.com/grpc/grpc-java/issues/4495
-    compile ('io.grpc:grpc-netty:1.10.1') { force = true }
-    compile ('io.grpc:grpc-protobuf:1.10.1') { force = true }
-    compile ('io.grpc:grpc-stub:1.10.1') { force = true }
-    compile ('io.netty:netty-tcnative-boringssl-static:2.0.8.Final') { force = true }
-    compile ('io.netty:netty-codec-http2:4.1.17.Final') { force = true }
 }
