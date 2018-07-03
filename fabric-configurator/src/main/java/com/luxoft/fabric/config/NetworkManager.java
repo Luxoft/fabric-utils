@@ -211,25 +211,12 @@ public class NetworkManager {
         return configTxLator.protoToJson("common.Config", bytes);
     }
 
-    public static byte[] signChannelUpdateConfig(final FabricConfig fabricConfig, String channelName, byte[] channelConfig, String userKey) throws Exception {
-        UpdateChannelConfiguration channelConfigurationUpdate = new UpdateChannelConfiguration(channelConfig);
-        User signingUser = fabricConfig.getAdmin(userKey);
-        Channel channel = getChannel(fabricConfig, channelName);
-        return channel.getUpdateChannelConfigurationSignature(channelConfigurationUpdate, signingUser);
-    }
-
     public static byte[] signChannelUpdateConfig(HFClient hfc, final FabricConfig fabricConfig, byte[] channelConfig, String userKey) throws Exception {
         UpdateChannelConfiguration channelConfigurationUpdate = new UpdateChannelConfiguration(channelConfig);
         User signingUser = fabricConfig.getAdmin(userKey);
         if (hfc.getUserContext() == null)
             hfc.setUserContext(signingUser);
         return hfc.getUpdateChannelConfigurationSignature(channelConfigurationUpdate, signingUser);
-    }
-
-    public static byte[] signChannelUpdateConfig(final FabricConfig fabricConfig, Channel channel, byte[] channelConfig, String userKey) throws Exception {
-        UpdateChannelConfiguration channelConfigurationUpdate = new UpdateChannelConfiguration(channelConfig);
-        User signingUser = fabricConfig.getAdmin(userKey);
-        return channel.getUpdateChannelConfigurationSignature(channelConfigurationUpdate, signingUser);
     }
 
     public static void setChannelConfig(final FabricConfig fabricConfig, String channelName, byte[] channelConfigurationUpdateBytes, byte[]... signatures) throws Exception {
@@ -266,21 +253,6 @@ public class NetworkManager {
         byte[] companyConfigGroupBytes = configTxLator.jsonToProtoBytes("common.ConfigGroup", companyConfigGroupJson);
         return generateAddCompanyToChannelUpdate(channel, companyName, companyConfigGroupBytes);
     }
-
-//    public static void addCompanyToChannel(final FabricConfig fabricConfig, String channelName, String companyName, String companyConfigGroupJson) throws Exception {
-//        Channel channel = getChannel(fabricConfig, channelName);
-//        byte[] companyConfigGroupBytes = configTxLator.jsonToProtoBytes("common.ConfigGroup", companyConfigGroupJson);
-//        addCompanyToChannel(fabricConfig, channel, companyName, companyConfigGroupBytes);
-//    }
-//
-//    protected static void addCompanyToChannel(final FabricConfig fabricConfig, Channel channel, String companyName, byte[] companyConfigGroupBytes) throws Exception {
-//        byte[] updateConfigurationBytes = generateAddCompanyToChannelUpdate(channel, companyName, companyConfigGroupBytes);
-//        UpdateChannelConfiguration channelConfigurationUpdate = new UpdateChannelConfiguration(updateConfigurationBytes);
-//
-//        String channelAdminKey = fabricConfig.getChannelDetails(channel.getName()).get("admin").asText();
-//        byte[] channelConfigurationSignature = signChannelUpdateConfig(fabricConfig, channel, updateConfigurationBytes, channelAdminKey);
-//        channel.updateChannelConfiguration(channelConfigurationUpdate, channelConfigurationSignature);
-//    }
 
     private static void installChaincodes(HFClient hfc, FabricConfig fabricConfig, List<Peer> peers, String chaincodeKey) throws InvalidArgumentException, ProposalException {
         ChaincodeID chaincodeID = fabricConfig.getChaincodeID(chaincodeKey);

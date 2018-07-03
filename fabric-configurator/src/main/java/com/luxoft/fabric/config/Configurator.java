@@ -78,7 +78,6 @@ public class Configurator extends NetworkManager {
             if (destFilePath == null)
                 destFilePath = channelName + ".json";
 
-//            FileUtils.writeByteArrayToFile(new File(destFilePath), getChannelConfig(fabricConfig, channelName));
             FileUtils.writeStringToFile(new File(destFilePath), getChannelConfigJson(fabricConfig, channelName), StandardCharsets.UTF_8);
         } else if (mode.equals(Arguments.ADD_COMPANY)) {
             String srcFilePath = requireNonNull(options.valueOf(src), "'src' argument required with path to companyConfigGroup json file");
@@ -90,10 +89,8 @@ public class Configurator extends NetworkManager {
 
             String fileContent = FileUtils.readFileToString(new File(srcFilePath), StandardCharsets.UTF_8);
             FileUtils.writeByteArrayToFile(new File(destFilePath), addCompanyToChannel(fabricConfig, channelName, companyName, fileContent));
-//            addCompanyToChannel(fabricConfig, channelName, companyName, fileContent);
         } else if (mode.equals(Arguments.SIGN_UPDATE)) {
             String srcFilePath = requireNonNull(options.valueOf(src), "'src' argument required with path to updated config proto file");
-//            String channelName = requireNonNull(options.valueOf(channel), "'channel' argument required with target channel");
             String adminName = requireNonNull(options.valueOf(admin), "'admin' argument required with admin user to sign");
             String destFilePath = options.valueOf(dest);
             if (destFilePath == null)
@@ -101,7 +98,6 @@ public class Configurator extends NetworkManager {
 
             byte[] fileContent = FileUtils.readFileToByteArray(new File(srcFilePath));
             byte[] channelUpdateConfigSignature = signChannelUpdateConfig(FabricConfig.createHFClient(), fabricConfig, fileContent, adminName);
-//            byte[] channelUpdateConfigSignature = signChannelUpdateConfig(fabricConfig, channelName, fileContent, adminName);
             FileUtils.writeByteArrayToFile(new File(destFilePath), channelUpdateConfigSignature);
         } else if (mode.equals(Arguments.SET_CHANNEL)) {
             String srcFilePath = requireNonNull(options.valueOf(src), "'src' argument required with path to updated config proto file");
@@ -122,7 +118,7 @@ public class Configurator extends NetworkManager {
             String channelName = requireNonNull(options.valueOf(channel), "'channel' argument required with target channel");
             String destFilePath = options.valueOf(dest);
             if (destFilePath == null)
-                destFilePath = srcFilePath + ".sign";
+                destFilePath = srcFilePath + ".update.bin";
 
             String fileContent = FileUtils.readFileToString(new File(srcFilePath), StandardCharsets.UTF_8);
             byte[] updatedChannel = updateChannel(fabricConfig, channelName, fileContent);
