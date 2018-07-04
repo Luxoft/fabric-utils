@@ -19,7 +19,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * Created by ADoroganov on 25.07.2017.
  */
-public class Configurator extends NetworkManager {
+public class Configurator {
 
     public static final class Arguments {
 
@@ -44,6 +44,7 @@ public class Configurator extends NetworkManager {
         public static final Arguments SIGN_UPDATE = new Arguments("signupdate");
         public static final Arguments SET_CHANNEL = new Arguments("setchannel");
         public static final Arguments ADD_COMPANY = new Arguments("addcompany");
+        public static final Arguments APP_SINGLE_ADMIN = new Arguments("appsingleadmin");
     }
 
     public static void main(String[] args) throws Exception {
@@ -51,6 +52,8 @@ public class Configurator extends NetworkManager {
         OptionParser parser = new OptionParser();
         OptionSpec<Arguments> type = parser.accepts("type").withRequiredArg().ofType(Arguments.class);
         OptionSpec<String> config = parser.accepts("config").withRequiredArg().ofType(String.class).defaultsTo("fabric.yaml");
+
+        OptionSpec<String> configtxlator = parser.accepts("configtxlator").withRequiredArg().ofType(String.class);
 
         OptionSpec<String> name = parser.accepts("name").withRequiredArg().ofType(String.class);
         OptionSpec<String> dest = parser.accepts("dest").withRequiredArg().ofType(String.class);
@@ -63,7 +66,11 @@ public class Configurator extends NetworkManager {
         OptionSet options = parser.parse(args);
         Arguments mode = options.valueOf(type);
 
-        Configurator cfg = new Configurator();
+        if (options.has(configtxlator)) {
+            NetworkManager.configTxLator = new ConfigTxLator(options.valueOf(configtxlator));
+        }
+
+        NetworkManager cfg = new NetworkManager();
 
         final String configFile = options.valueOf(config);
         FabricConfig fabricConfig = FabricConfig.getConfigFromFile(configFile);
@@ -78,7 +85,7 @@ public class Configurator extends NetworkManager {
             if (destFilePath == null)
                 destFilePath = channelName + ".json";
 
-            FileUtils.writeStringToFile(new File(destFilePath), getChannelConfigJson(fabricConfig, channelName), StandardCharsets.UTF_8);
+            FileUtils.writeStringToFile(new File(destFilePath), cfg.getChannelConfigJson(fabricConfig, channelName), StandardCharsets.UTF_8);
         } else if (mode.equals(Arguments.ADD_COMPANY)) {
             String srcFilePath = requireNonNull(options.valueOf(src), "'src' argument required with path to companyConfigGroup json file");
             String channelName = requireNonNull(options.valueOf(channel), "'channel' argument required with target channel");
@@ -88,7 +95,7 @@ public class Configurator extends NetworkManager {
                 destFilePath = srcFilePath + ".update.bin";
 
             String fileContent = FileUtils.readFileToString(new File(srcFilePath), StandardCharsets.UTF_8);
-            FileUtils.writeByteArrayToFile(new File(destFilePath), addCompanyToChannel(fabricConfig, channelName, companyName, fileContent));
+            FileUtils.writeByteArrayToFile(new File(destFilePath), cfg.addCompanyToChannel(fabricConfig, channelName, companyName, fileContent));
         } else if (mode.equals(Arguments.SIGN_UPDATE)) {
             String srcFilePath = requireNonNull(options.valueOf(src), "'src' argument required with path to updated config proto file");
             String adminName = requireNonNull(options.valueOf(admin), "'admin' argument required with admin user to sign");
@@ -97,7 +104,7 @@ public class Configurator extends NetworkManager {
                 destFilePath = srcFilePath + ".sign";
 
             byte[] fileContent = FileUtils.readFileToByteArray(new File(srcFilePath));
-            byte[] channelUpdateConfigSignature = signChannelUpdateConfig(FabricConfig.createHFClient(), fabricConfig, fileContent, adminName);
+            byte[] channelUpdateConfigSignature = cfg.signChannelUpdateConfig(FabricConfig.createHFClient(), fabricConfig, fileContent, adminName);
             FileUtils.writeByteArrayToFile(new File(destFilePath), channelUpdateConfigSignature);
         } else if (mode.equals(Arguments.SET_CHANNEL)) {
             String srcFilePath = requireNonNull(options.valueOf(src), "'src' argument required with path to updated config proto file");
@@ -112,7 +119,7 @@ public class Configurator extends NetworkManager {
                 signaturesBytes[i] = FileUtils.readFileToByteArray(new File(signaturePath));
             }
             byte[] fileContent = FileUtils.readFileToByteArray(new File(srcFilePath));
-            setChannelConfig(fabricConfig, channelName, fileContent, signaturesBytes);
+            cfg.setChannelConfig(fabricConfig, channelName, fileContent, signaturesBytes);
         } else if (mode.equals(Arguments.UPDATE_CHANNEL)) {
             String srcFilePath = requireNonNull(options.valueOf(src), "'src' argument required with path to updated config json file");
             String channelName = requireNonNull(options.valueOf(channel), "'channel' argument required with target channel");
@@ -121,7 +128,16 @@ public class Configurator extends NetworkManager {
                 destFilePath = srcFilePath + ".update.bin";
 
             String fileContent = FileUtils.readFileToString(new File(srcFilePath), StandardCharsets.UTF_8);
-            byte[] updatedChannel = updateChannel(fabricConfig, channelName, fileContent);
+            byte[] updatedChannel = NetworkManager.updateChannel(fabricConfig, channelName, fileContent);
+            FileUtils.writeByteArrayToFile(new File(destFilePath), updatedChannel);
+        } else if (mode.equals(Arguments.APP_SINGLE_ADMIN)) {
+            String channelName = requireNonNull(options.valueOf(channel), "'channel' argument required with target channel");
+            String companyName = options.valueOf(company);
+            String destFilePath = options.valueOf(dest);
+            if (destFilePath == null)
+                destFilePath = channelName + ".update.bin";
+
+            byte[] updatedChannel = cfg.setAppSingleAdmin(fabricConfig, channelName, companyName);
             FileUtils.writeByteArrayToFile(new File(destFilePath), updatedChannel);
         } else {
 
@@ -132,9 +148,9 @@ public class Configurator extends NetworkManager {
                     : Collections.EMPTY_SET;
 
             if (mode.equals(Arguments.DEPLOY))
-                deployChaincodes(hfClient, fabricConfig, names);
+                cfg.deployChaincodes(hfClient, fabricConfig, names);
             else if (mode.equals(Arguments.UPGRADE))
-                upgradeChaincodes(hfClient, fabricConfig, names);
+                cfg.upgradeChaincodes(hfClient, fabricConfig, names);
         }
     }
 }

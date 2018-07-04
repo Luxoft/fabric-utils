@@ -18,7 +18,7 @@ import java.util.*;
  * Created by ADoroganov on 25.07.2017.
  */
 public class NetworkManager {
-    static private ConfigTxLator configTxLator = new ConfigTxLator();
+    static protected ConfigTxLator configTxLator = new ConfigTxLator();
 
     public static void configNetwork(final FabricConfig fabricConfig) throws IOException {
 
@@ -252,6 +252,28 @@ public class NetworkManager {
         Channel channel = getChannel(fabricConfig, channelName);
         byte[] companyConfigGroupBytes = configTxLator.jsonToProtoBytes("common.ConfigGroup", companyConfigGroupJson);
         return generateAddCompanyToChannelUpdate(channel, companyName, companyConfigGroupBytes);
+    }
+
+    public static byte[] setAppSingleAdmin(final FabricConfig fabricConfig, String channelName, String companyName) throws Exception {
+        Channel channel = getChannel(fabricConfig, channelName);
+        byte[] channelConfigBytes = channel.getChannelConfigurationBytes();
+        Configtx.Config.Builder targetChannelConfig = Configtx.Config.parseFrom(channelConfigBytes).toBuilder();
+
+        final String channelGroupName = "Application";
+        final String policyGroupName = "Admins";
+        Configtx.ConfigGroup.Builder channelGroup = targetChannelConfig.getChannelGroup().toBuilder();
+        Configtx.ConfigGroup.Builder applicationConfigGroup = channelGroup.getGroupsOrThrow(channelGroupName).toBuilder();
+        Configtx.ConfigGroup targetCompanyConfigGroup;
+        if (companyName != null)
+            targetCompanyConfigGroup = applicationConfigGroup.getGroupsOrThrow(companyName);
+        else
+            targetCompanyConfigGroup = applicationConfigGroup.getGroupsMap().entrySet().stream().findFirst().get().getValue();
+        Configtx.ConfigPolicy targetPolicyConfig = targetCompanyConfigGroup.getPoliciesOrThrow(policyGroupName);
+
+        applicationConfigGroup.putPolicies(policyGroupName, targetPolicyConfig);
+        channelGroup.putGroups(channelGroupName, applicationConfigGroup.build());
+        targetChannelConfig.setChannelGroup(channelGroup.build());
+        return configTxLator.queryUpdateConfigurationBytes(channel.getName(), channelConfigBytes, targetChannelConfig.build().toByteArray());
     }
 
     private static void installChaincodes(HFClient hfc, FabricConfig fabricConfig, List<Peer> peers, String chaincodeKey) throws InvalidArgumentException, ProposalException {
