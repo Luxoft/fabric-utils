@@ -32,7 +32,7 @@ function generateChannelArtifacts() {
 #  echo "##########################################################"
   # Note: For some unknown reason (at least for now) the block file can't be
   # named orderer.genesis.block or the orderer will fail to launch!
-  configtxgen -profile OneOrgOrdererGenesis -outputBlock ./channel-artifacts/$CHANNEL_NAME/genesis.block
+  configtxgen -profile TwoOrgsOrdererGenesis -outputBlock ./channel/genesis.block
   if [ "$?" -ne 0 ]; then
     echo "Failed to generate orderer genesis block..."
     exit 1
@@ -41,7 +41,7 @@ function generateChannelArtifacts() {
 #  echo "#################################################################"
 #  echo "### Generating channel configuration transaction 'channel.tx' ###"
 #  echo "#################################################################"
-  configtxgen -profile OneOrgChannel -outputCreateChannelTx ./channel-artifacts/${CHANNEL_NAME}/channel.tx -channelID $CHANNEL_NAME
+  configtxgen -profile TwoOrgsChannel -outputCreateChannelTx ./channel/$CHANNEL_NAME.tx -channelID $CHANNEL_NAME
   if [ "$?" -ne 0 ]; then
     echo "Failed to generate channel configuration transaction..."
     exit 1
@@ -51,7 +51,7 @@ function generateChannelArtifacts() {
 #  echo "#################################################################"
 #  echo "#######    Generating anchor peer update for Org1MSP   ##########"
 #  echo "#################################################################"
-  configtxgen -profile OneOrgChannel -outputAnchorPeersUpdate ./channel-artifacts/${CHANNEL_NAME}/Org1MSPanchors.tx -channelID $CHANNEL_NAME -asOrg Org1MSP
+  configtxgen -profile TwoOrgsChannel -outputAnchorPeersUpdate ./channel/Org1MSPanchors.tx -channelID $CHANNEL_NAME -asOrg Org1MSP
   if [ "$?" -ne 0 ]; then
     echo "Failed to generate anchor peer update for Org1MSP..."
     exit 1
@@ -61,17 +61,16 @@ function generateChannelArtifacts() {
 #  echo "#################################################################"
 #  echo "#######    Generating anchor peer update for Org2MSP   ##########"
 #  echo "#################################################################"
-#  configtxgen -profile TwoOrgsChannel -outputAnchorPeersUpdate \
-#  ./channel-artifacts/Org2MSPanchors.tx -channelID $CHANNEL_NAME -asOrg Org2MSP
-#  if [ "$?" -ne 0 ]; then
-#    echo "Failed to generate anchor peer update for Org2MSP..."
-#    exit 1
-#  fi
+  configtxgen -profile TwoOrgsChannel -outputAnchorPeersUpdate ./channel/Org2MSPanchors.tx -channelID $CHANNEL_NAME -asOrg Org2MSP
+  if [ "$?" -ne 0 ]; then
+    echo "Failed to generate anchor peer update for Org2MSP..."
+    exit 1
+  fi
   echo
 }
 
 CLI_TIMEOUT=10000
-CHANNEL_NAME="demo-channel"
+CHANNEL_NAME="mychannel"
 
 # Parse commandline args
 while getopts "m:c:" opt; do
@@ -81,12 +80,10 @@ while getopts "m:c:" opt; do
   esac
 done
 
-mkdir -p "channel-artifacts/${CHANNEL_NAME}"
-
 echo "Generating artifacts for channel '${CHANNEL_NAME}'"
 #askProceed
 
-
+export FABRIC_CFG_PATH=./channel/
 
 generateChannelArtifacts
 
