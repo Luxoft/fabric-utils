@@ -44,6 +44,7 @@ public class Configurator {
         public static final Arguments SIGN_UPDATE = new Arguments("signupdate");
         public static final Arguments SET_CHANNEL = new Arguments("setchannel");
         public static final Arguments ADD_COMPANY = new Arguments("addcompany");
+        public static final Arguments ADD_ANCHOR = new Arguments("addanchor");
         public static final Arguments APP_SINGLE_ADMIN = new Arguments("appsingleadmin");
     }
 
@@ -96,6 +97,14 @@ public class Configurator {
 
             String fileContent = FileUtils.readFileToString(new File(srcFilePath), StandardCharsets.UTF_8);
             FileUtils.writeByteArrayToFile(new File(destFilePath), cfg.addCompanyToChannel(fabricConfig, channelName, companyName, fileContent));
+        } else if (mode.equals(Arguments.ADD_ANCHOR)) {
+            String srcFilePath = requireNonNull(options.valueOf(src), "'src' argument required with path to anchor proto file");
+            String destFilePath = options.valueOf(dest);
+            if (destFilePath == null)
+                destFilePath = srcFilePath + ".update.bin";
+
+            byte[] fileContent = FileUtils.readFileToByteArray(new File(srcFilePath));
+            FileUtils.writeByteArrayToFile(new File(destFilePath), cfg.addAnchorToChannel(fileContent));
         } else if (mode.equals(Arguments.SIGN_UPDATE)) {
             String srcFilePath = requireNonNull(options.valueOf(src), "'src' argument required with path to updated config proto file");
             String adminName = requireNonNull(options.valueOf(admin), "'admin' argument required with admin user to sign");

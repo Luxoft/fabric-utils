@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.FabricConfig;
 import com.luxoft.fabric.FabricConnector;
 import com.luxoft.fabric.utils.MiscUtils;
+import org.hyperledger.fabric.protos.common.Common;
 import org.hyperledger.fabric.protos.common.Configtx;
 import org.hyperledger.fabric.protos.peer.Query;
 import org.hyperledger.fabric.sdk.*;
@@ -252,6 +253,10 @@ public class NetworkManager {
         Channel channel = getChannel(fabricConfig, channelName);
         byte[] companyConfigGroupBytes = configTxLator.jsonToProtoBytes("common.ConfigGroup", companyConfigGroupJson);
         return generateAddCompanyToChannelUpdate(channel, companyName, companyConfigGroupBytes);
+    }
+
+    public static byte[] addAnchorToChannel(byte[] anchorProto) throws Exception {
+        return Configtx.ConfigUpdate.parseFrom(Configtx.ConfigUpdateEnvelope.parseFrom(Common.Payload.parseFrom(Common.Envelope.parseFrom(anchorProto).getPayload()).getData()).getConfigUpdate()).toByteArray();
     }
 
     public static byte[] setAppSingleAdmin(final FabricConfig fabricConfig, String channelName, String companyName) throws Exception {
