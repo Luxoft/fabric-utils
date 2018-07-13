@@ -2,8 +2,8 @@ package com.luxoft.fabric;
 
 import com.google.protobuf.Empty;
 import com.google.protobuf.Message;
-import com.luxoft.fabric.ordering.FabricHelpers;
 import com.luxoft.fabric.ordering.FabricQueryException;
+import com.luxoft.fabric.utils.TxUtils;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
@@ -287,11 +287,11 @@ public class OrderingEventTracker implements EventTracker {
 
         private CompletableFuture<EventSubscriptionList> filterSubscriptions(BlockData blockData) {
             CompletableFuture<EventSubscriptionList> result = CompletableFuture.completedFuture(new EventSubscriptionList());
-            final Iterator<BlockInfo.TransactionEnvelopeInfo> txIterator = FabricHelpers.getBlockTransactions(blockData.blockInfo);
+            final Iterator<BlockInfo.TransactionEnvelopeInfo> txIterator = TxUtils.getBlockTransactions(blockData.blockInfo);
 
             while (txIterator.hasNext()) {
                 final BlockInfo.TransactionEnvelopeInfo transactionEnvelopeInfo = txIterator.next();
-                final List<ChaincodeEvent> transactionEvents = FabricHelpers.getTransactionEvents(transactionEnvelopeInfo);
+                final List<ChaincodeEvent> transactionEvents = TxUtils.getTransactionEvents(transactionEnvelopeInfo);
 
                 final String transactionID = transactionEnvelopeInfo.getTransactionID();
 
@@ -345,7 +345,7 @@ public class OrderingEventTracker implements EventTracker {
                 String s = iterator.next();
                 List<ChaincodeEvent> chaincodeEvents;
                 try {
-                    chaincodeEvents = FabricQueryException.withGuard(() -> FabricHelpers.queryEventsByTransactionID(channel, s));
+                    chaincodeEvents = FabricQueryException.withGuard(() -> TxUtils.queryEventsByTransactionID(channel, s));
                 } catch (FabricQueryException e) {
                     // TODO
                     logger.warn("Exception while queriying data", e);
@@ -444,7 +444,7 @@ public class OrderingEventTracker implements EventTracker {
                 if (e.isValid() && e instanceof BlockInfo.TransactionEnvelopeInfo) {
                     final BlockInfo.TransactionEnvelopeInfo txEnvelopeInfo = (BlockInfo.TransactionEnvelopeInfo) e;
                     txList.computeIfAbsent(e.getTransactionID(),
-                            (k) -> FabricHelpers.getTransactionEvents(txEnvelopeInfo));
+                            (k) -> TxUtils.getTransactionEvents(txEnvelopeInfo));
                 }
             });
 

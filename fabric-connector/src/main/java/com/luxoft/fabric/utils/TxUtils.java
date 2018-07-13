@@ -1,13 +1,14 @@
-package com.luxoft.fabric.ordering;
+package com.luxoft.fabric.utils;
 
 import com.google.protobuf.InvalidProtocolBufferException;
+import com.luxoft.fabric.ordering.FabricQueryException;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
 
 import java.util.*;
 
-public class FabricHelpers {
+public class TxUtils {
     public static Iterator<ChaincodeEvent> getBlockEvents(BlockInfo blockInfo) {
 
         Iterator<ChaincodeEvent> iterator = new Iterator<ChaincodeEvent>() {
@@ -118,11 +119,15 @@ public class FabricHelpers {
     }
 
     public static List<ChaincodeEvent> queryEventsByTransactionID(Channel channel, String transactionID) throws InvalidArgumentException, ProposalException, InvalidProtocolBufferException, FabricQueryException {
-        return TxUtil.queryEventsByTransactionID(channel, transactionID);
+        return SdkTxUtil.queryEventsByTransactionID(channel, transactionID);
     }
 
     public static List<ChaincodeEvent> getTransactionEvents(TransactionInfo transactionInfo) throws InvalidProtocolBufferException {
-        return TxUtil.getEventsByTransactionInfo(transactionInfo);
+        return SdkTxUtil.getEventsByTransactionInfo(transactionInfo);
+    }
+
+    public static SdkTxUtil.TransactionInfoEx getTransaction(TransactionInfo transactionInfo) throws InvalidProtocolBufferException {
+        return SdkTxUtil.getTransaction(transactionInfo);
     }
 
 }
