@@ -92,4 +92,25 @@ public class MiscUtils
         return Objects.equals(chaincodeID.getName(), chaincodeInfo.getName()) &&
                 Objects.equals(chaincodeID.getVersion(), chaincodeInfo.getVersion());
     }
+
+    @FunctionalInterface
+    public interface ThrowingSupplier<T> {
+        T get() throws Exception;
+    }
+
+    public static <T> T runWithRetries(int maxRetries, int delaySec, ThrowingSupplier<T> t) throws InterruptedException {
+        int count = 0;
+        RuntimeException ex = new RuntimeException("Failed to get in " + maxRetries + " times with delay " + delaySec);
+        if (maxRetries < 0)
+            maxRetries = 0;
+        while (count++ <= maxRetries) {
+            try {
+                return t.get();
+            } catch (Exception e) {
+                ex.addSuppressed(new RuntimeException("Failed to get " + count + " time", e));
+                Thread.sleep(delaySec * 1000);
+            }
+        }
+        throw ex;
+    }
 }

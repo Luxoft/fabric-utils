@@ -12,8 +12,9 @@ import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.*;
+
+import static com.luxoft.fabric.utils.MiscUtils.runWithRetries;
 
 /**
  * Created by ADoroganov on 25.07.2017.
@@ -21,7 +22,11 @@ import java.util.*;
 public class NetworkManager {
     static protected ConfigTxLator configTxLator = new ConfigTxLator();
 
-    public static void configNetwork(final FabricConfig fabricConfig) throws IOException {
+    //taken from my first network sample
+    static final int peerRetryDelaySec = 10;
+    static final int peerRetryCount = 5;
+
+    public static void configNetwork(final FabricConfig fabricConfig) {
 
         Iterator<JsonNode> channels = fabricConfig.getChannels();
         if (!channels.hasNext())
@@ -78,25 +83,26 @@ public class NetworkManager {
                 }
 
                 boolean newChannel = false;
-                Channel channel;
-                if (!channelExists) {
-                        String txFile = fabricConfig.getFileName(channelParameters, "txFile");
-                        ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
+                Channel channelObj;
+                String txFile = fabricConfig.getFileName(channelParameters, "txFile");
+                if (!channelExists && txFile != null) {
                     try {
+                        ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
                         byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, hfClient.getUserContext());
-                        channel = hfClient.newChannel(channelName, ordererList.get(0), channelConfiguration, channelConfigurationSignature);
+                        channelObj = hfClient.newChannel(channelName, ordererList.get(0), channelConfiguration, channelConfigurationSignature);
                         newChannel = true;
                     } catch (Exception ex) {
+                        System.err.println("Exception happened while creating channel, this might not be a problem");
+                        ex.printStackTrace();
                         //recreating orderer object as it may be consumed by try channel and will be destroyed on it`s GC
                         Orderer newOrderer = fabricConfig.getNewOrderer(hfClient, ordererList.get(0).getName());
                         ordererList.set(0, newOrderer);
-                        channel = hfClient.newChannel(channelName);
-                        System.out.println("Exception happened while creating channel, this might not be a problem");
-                        ex.printStackTrace();
+                        channelObj = hfClient.newChannel(channelName);
                     }
                 } else {
-                    channel = hfClient.newChannel(channelName);
+                    channelObj = hfClient.newChannel(channelName);
                 }
+                final Channel channel = channelObj;
 
                 for (int i = newChannel ? 1 : 0; i < ordererList.size(); i++) {
                     channel.addOrderer(ordererList.get(i));
@@ -105,16 +111,20 @@ public class NetworkManager {
                     if (peersWithChannel.contains(peer))
                         channel.addPeer(peer);
                     else
-                        channel.joinPeer(peer);
+                        runWithRetries(peerRetryCount, peerRetryDelaySec, () -> channel.joinPeer(peer));
                 }
 
                 for (EventHub eventhub : eventhubList) {
                     channel.addEventHub(eventhub);
                 }
                 channel.initialize();
-                List<Query.ChaincodeInfo> chaincodeInfoList = new ArrayList<>();
+                Set<Query.ChaincodeInfo> chaincodeInfoList = new HashSet<>();
                 for (Peer peer : peerList) {
-                    chaincodeInfoList.addAll(channel.queryInstantiatedChaincodes(peer));
+                    MiscUtils.ThrowingSupplier action = () -> chaincodeInfoList.addAll(channel.queryInstantiatedChaincodes(peer));
+                    if (peersWithChannel.contains(peer))
+                        action.get();
+                    else
+                        runWithRetries(peerRetryCount, peerRetryDelaySec, action);
                 }
 
                 for (JsonNode jsonNode : channelParameters.get("chaincodes")) {
