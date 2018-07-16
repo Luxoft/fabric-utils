@@ -13,6 +13,7 @@ import org.hyperledger.fabric.sdk.exception.ProposalException;
 
 import java.io.File;
 import java.util.*;
+import java.util.concurrent.Callable;
 
 import static com.luxoft.fabric.utils.MiscUtils.runWithRetries;
 
@@ -120,9 +121,9 @@ public class NetworkManager {
                 channel.initialize();
                 Set<Query.ChaincodeInfo> chaincodeInfoList = new HashSet<>();
                 for (Peer peer : peerList) {
-                    MiscUtils.ThrowingSupplier action = () -> chaincodeInfoList.addAll(channel.queryInstantiatedChaincodes(peer));
+                    Callable action = () -> chaincodeInfoList.addAll(channel.queryInstantiatedChaincodes(peer));
                     if (peersWithChannel.contains(peer))
-                        action.get();
+                        action.call();
                     else
                         runWithRetries(peerRetryCount, peerRetryDelaySec, action);
                 }

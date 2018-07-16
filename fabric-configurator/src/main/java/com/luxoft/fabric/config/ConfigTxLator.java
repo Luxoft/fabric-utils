@@ -16,19 +16,19 @@ import org.hyperledger.fabric.protos.common.Configtx;
 import java.io.IOException;
 
 public class ConfigTxLator {
-    private String CONFIGTXLATOR_LOCATION = "http://localhost:7059";
+    private String configtxlatorLocation = "http://localhost:7059";
 
-    private HttpClient httpclient = HttpClients.createDefault();
+    private HttpClient httpClient = HttpClients.createDefault();
 
     public ConfigTxLator() {
     }
 
     public ConfigTxLator(String location) {
-        CONFIGTXLATOR_LOCATION = location;
+        configtxlatorLocation = location;
     }
 
     public byte[] queryUpdateConfigurationBytes(String channelName, byte[] currentChannelConfigurationBytes, byte[] targetChannelConfigurationBytes) throws IOException {
-        HttpPost httppost = new HttpPost(CONFIGTXLATOR_LOCATION + "/configtxlator/compute/update-from-configs");
+        HttpPost httppost = new HttpPost(configtxlatorLocation + "/configtxlator/compute/update-from-configs");
 
         HttpEntity multipartEntity = MultipartEntityBuilder.create()
                 .setMode(HttpMultipartMode.BROWSER_COMPATIBLE)
@@ -37,10 +37,10 @@ public class ConfigTxLator {
                 .addBinaryBody("channel", channelName.getBytes()).build();
 
         httppost.setEntity(multipartEntity);
-        HttpResponse response = httpclient.execute(httppost);
+        HttpResponse response = httpClient.execute(httppost);
         int statuscode = response.getStatusLine().getStatusCode();
         System.out.println(String.format("Got %s status for updated config bytes needed for updateChannelConfiguration", statuscode));
-        if (statuscode != 200) {
+        if (statuscode / 100 != 2) {
             throw new RuntimeException("Failed to fetch update config, reason:\n" + EntityUtils.toString(response.getEntity()));
         }
 
@@ -59,12 +59,12 @@ public class ConfigTxLator {
                 break;
         }
 
-        HttpPost httppost = new HttpPost(CONFIGTXLATOR_LOCATION + "/protolator/encode/" + protoType);
+        HttpPost httppost = new HttpPost(configtxlatorLocation + "/protolator/encode/" + protoType);
         httppost.setEntity(new StringEntity(json));
-        HttpResponse response = httpclient.execute(httppost);
+        HttpResponse response = httpClient.execute(httppost);
         int statuscode = response.getStatusLine().getStatusCode();
         System.out.println(String.format("Got %s status for json to proto conversion", statuscode));
-        if (statuscode != 200) {
+        if (statuscode / 100 != 2) {
             throw new RuntimeException("Failed to convert json to proto, reason:\n" + EntityUtils.toString(response.getEntity()));
         }
 
@@ -80,12 +80,12 @@ public class ConfigTxLator {
     }
 
     public String protoToJson(String protoType, byte[] proto) throws IOException {
-        HttpPost httppost = new HttpPost(CONFIGTXLATOR_LOCATION + "/protolator/decode/" + protoType);
+        HttpPost httppost = new HttpPost(configtxlatorLocation + "/protolator/decode/" + protoType);
         httppost.setEntity(new ByteArrayEntity(proto));
-        HttpResponse response = httpclient.execute(httppost);
+        HttpResponse response = httpClient.execute(httppost);
         int statuscode = response.getStatusLine().getStatusCode();
         System.out.println(String.format("Got %s status for json to proto conversion", statuscode));
-        if (statuscode != 200) {
+        if (statuscode / 100 != 2) {
             throw new RuntimeException("Failed to convert json to proto, reason:\n" + EntityUtils.toString(response.getEntity()));
         }
 

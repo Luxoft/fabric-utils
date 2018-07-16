@@ -12,6 +12,7 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
@@ -93,19 +94,14 @@ public class MiscUtils
                 Objects.equals(chaincodeID.getVersion(), chaincodeInfo.getVersion());
     }
 
-    @FunctionalInterface
-    public interface ThrowingSupplier<T> {
-        T get() throws Exception;
-    }
-
-    public static <T> T runWithRetries(int maxRetries, int delaySec, ThrowingSupplier<T> t) throws InterruptedException {
+    public static <T> T runWithRetries(int maxRetries, int delaySec, Callable<T> t) throws InterruptedException {
         int count = 0;
         RuntimeException ex = new RuntimeException("Failed to get in " + maxRetries + " times with delay " + delaySec);
         if (maxRetries < 0)
             maxRetries = 0;
         while (count++ <= maxRetries) {
             try {
-                return t.get();
+                return t.call();
             } catch (Exception e) {
                 ex.addSuppressed(new RuntimeException("Failed to get " + count + " time", e));
                 Thread.sleep(delaySec * 1000);
