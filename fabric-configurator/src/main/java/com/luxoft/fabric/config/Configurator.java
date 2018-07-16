@@ -46,6 +46,7 @@ public class Configurator {
         public static final Arguments ADD_COMPANY = new Arguments("addcompany");
         public static final Arguments ADD_ANCHOR = new Arguments("addanchor");
         public static final Arguments APP_SINGLE_ADMIN = new Arguments("appsingleadmin");
+        public static final Arguments WAIT_CHAINCODE = new Arguments("wait-chaincode");
     }
 
     public static void main(String[] args) throws Exception {
@@ -63,6 +64,7 @@ public class Configurator {
         OptionSpec<String> company = parser.accepts("company").withRequiredArg().ofType(String.class);
         OptionSpec<String> admin = parser.accepts("admin").withRequiredArg().ofType(String.class);
         OptionSpec<String> signatures = parser.accepts("signature").withRequiredArg().ofType(String.class);
+        OptionSpec<Integer> timeout = parser.accepts("timeout").withOptionalArg().ofType(Integer.class).defaultsTo(60);
 
         OptionSet options = parser.parse(args);
         Arguments mode = options.valueOf(type);
@@ -160,6 +162,8 @@ public class Configurator {
                 cfg.deployChaincodes(hfClient, fabricConfig, names);
             else if (mode.equals(Arguments.UPGRADE))
                 cfg.upgradeChaincodes(hfClient, fabricConfig, names);
+            else if (mode.equals(Arguments.WAIT_CHAINCODE))
+                cfg.waitChaincodes(hfClient, fabricConfig, names, options.valueOf(timeout));
         }
     }
 }

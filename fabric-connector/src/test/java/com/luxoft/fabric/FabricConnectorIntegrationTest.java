@@ -46,7 +46,7 @@ public class FabricConnectorIntegrationTest {
      */
     @Test
     public void testSanityCheck() throws Exception {
-        FabricConnector fabricConnector = new FabricConnector(fabricConfig);
+        FabricConnector fabricConnector = new FabricConnector(fabricConfig, null);
 
         byte[] key = "someKey".getBytes();
         byte[] value = UUID.randomUUID().toString().getBytes();
@@ -62,7 +62,7 @@ public class FabricConnectorIntegrationTest {
 
     @Test
     public void testTxRace() throws Exception {
-        FabricConnector fabricConnector = new FabricConnector(fabricConfig);
+        FabricConnector fabricConnector = new FabricConnector(fabricConfig, null);
 
         AtomicInteger success = new AtomicInteger();
 

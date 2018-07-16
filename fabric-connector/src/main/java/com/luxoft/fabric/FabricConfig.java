@@ -45,9 +45,11 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.spec.InvalidKeySpecException;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
@@ -60,7 +62,15 @@ public class FabricConfig extends YamlConfig {
 
     static {
         //loading Fabric security provider to the system
-        CryptoSuite.Factory.getCryptoSuite();
+        getCryptoSuite();
+    }
+
+    public static CryptoSuite getCryptoSuite() {
+        try {
+            return CryptoSuite.Factory.getCryptoSuite();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public FabricConfig(Reader configReader) throws IOException {
@@ -81,7 +91,7 @@ public class FabricConfig extends YamlConfig {
     }
 
     public static HFClient createHFClient() throws CryptoException, InvalidArgumentException {
-        CryptoSuite cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
+        CryptoSuite cryptoSuite = getCryptoSuite();
         HFClient hfClient = HFClient.createNewInstance();
         hfClient.setCryptoSuite(cryptoSuite);
         return hfClient;
@@ -268,30 +278,37 @@ public class FabricConfig extends YamlConfig {
         return hfClient.newChannel(channelName, orderer, channelConfiguration, channelConfigurationSignature);
     }
 
-    public void initChannel(HFClient hfClient, String channelName) throws Exception {
-        getChannel(hfClient, channelName);
+    public void initChannel(HFClient hfClient, String channelName, FabricConnector.Options options) throws Exception {
+        getChannel(hfClient, channelName, options);
     }
 
-    public void initChannel(HFClient hfClient, String channelName, User fabricUser) throws Exception {
-        getChannel(hfClient, channelName, fabricUser);
+    public void initChannel(HFClient hfClient, String channelName, User fabricUser, FabricConnector.Options options) throws Exception {
+        getChannel(hfClient, channelName, fabricUser, options);
     }
 
-    public Channel getChannel(HFClient hfClient, String channelName) throws Exception {
+    public Channel getChannel(HFClient hfClient, String channelName, FabricConnector.Options options) throws Exception {
         JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
         String adminKey = channelParameters.get("admin").asText();
         final User fabricUser = getAdmin(adminKey);
-        return getChannel(hfClient, channelName, fabricUser);
+        return getChannel(hfClient, channelName, fabricUser, options);
     }
 
-    public Channel getChannel(HFClient hfClient, String channelName, User fabricUser) throws Exception {
+    public Channel getChannel(HFClient hfClient, String channelName, User fabricUser, FabricConnector.Options options) throws Exception {
         JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
         requireNonNull(fabricUser);
         hfClient.setUserContext(fabricUser);
 
-        String ordererName = channelParameters.get("orderers").get(0).asText();
-        Orderer orderer = getNewOrderer(hfClient, ordererName);
+        Iterator<JsonNode> orderers = channelParameters.path("orderers").iterator();
+        if (!orderers.hasNext())
+            throw new RuntimeException("Orderers list can`t be empty");
+        List<Orderer> ordererList = new ArrayList<>();
+        while (orderers.hasNext()) {
+            String ordererKey = orderers.next().asText();
+            Orderer orderer = getNewOrderer(hfClient, ordererKey);
+            ordererList.add(orderer);
+        }
 
-        Iterator<JsonNode> peers = channelParameters.get("peers").iterator();
+        Iterator<JsonNode> peers = channelParameters.path("peers").iterator();
         if (!peers.hasNext())
             throw new RuntimeException("Peers list can`t be empty");
         List<Peer> peerList = new ArrayList<>();
@@ -301,7 +318,7 @@ public class FabricConfig extends YamlConfig {
             peerList.add(peer);
         }
 
-        Iterator<JsonNode> eventhubs = channelParameters.get("eventhubs").iterator();
+        Iterator<JsonNode> eventhubs = channelParameters.path("eventhubs").iterator();
         List<EventHub> eventhubList = new ArrayList<>();
         while (eventhubs.hasNext()) {
             String eventhubKey = eventhubs.next().asText();
@@ -310,14 +327,41 @@ public class FabricConfig extends YamlConfig {
         }
 
         Channel channel = hfClient.newChannel(channelName);
-        channel.addOrderer(orderer);
-        for (Peer peer : peerList) {
-            channel.addPeer(peer);
+        final EventTracker eventTracker = options != null ? options.eventTracker : null;
+        final Channel.PeerOptions peerOptions = Channel.PeerOptions.createPeerOptions();
+
+        if (eventTracker != null) {
+            eventTracker.configureChannel(channel);
+            final long startBlock = eventTracker.getStartBlock(channel);
+
+            if (startBlock > 0 && startBlock < Long.MAX_VALUE)
+                peerOptions.startEvents(startBlock);
+            else
+                peerOptions.startEventsNewest();
+
+            if (eventTracker.useFilteredBlocks(channel))
+                peerOptions.registerEventsForFilteredBlocks();
+            else
+                peerOptions.registerEventsForBlocks();
         }
+
+        for (Orderer orderer : ordererList) {
+            channel.addOrderer(orderer);
+        }
+
+        for (Peer peer : peerList) {
+            channel.addPeer(peer, peerOptions);
+        }
+
         for (EventHub eventhub : eventhubList) {
             channel.addEventHub(eventhub);
         }
+
         channel.initialize();
+
+        if (eventTracker != null)
+            eventTracker.connectChannel(channel);
+
         return channel;
     }
 
@@ -476,7 +520,7 @@ public class FabricConfig extends YamlConfig {
 
     public HFCAClient createHFCAClient(String caKey, CryptoSuite cryptoSuite) throws MalformedURLException {
         if (cryptoSuite == null)
-            cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
+            cryptoSuite = getCryptoSuite();
         HFCAClient hfcaClient = createHFCAClient(caKey);
         hfcaClient.setCryptoSuite(cryptoSuite);
         return hfcaClient;
@@ -531,6 +575,62 @@ public class FabricConfig extends YamlConfig {
         }
     }
 
+    private static class TimePair {
+        final TimeUnit timeUnit;
+        final long value;
+
+        TimePair(long value, TimeUnit timeUnit) {
+            this.value = value;
+            this.timeUnit = timeUnit;
+        }
+    }
+
+    ;
+
+    private static TimePair parseInterval(String s) {
+        final TimePair[] nsUnits = {
+                new TimePair(1000, TimeUnit.NANOSECONDS),
+                new TimePair(1000, TimeUnit.MICROSECONDS),
+                new TimePair(Long.MAX_VALUE, TimeUnit.MILLISECONDS),
+        };
+
+        final TimePair[] sUnits = {
+                new TimePair(60, TimeUnit.SECONDS),
+                new TimePair(60, TimeUnit.MINUTES),
+                new TimePair(24, TimeUnit.HOURS),
+                new TimePair(Long.MAX_VALUE, TimeUnit.DAYS),
+        };
+
+        final Duration duration = Duration.parse(s);
+        long value;
+        TimeUnit timeUnit = null;
+
+        if (duration.isNegative() || duration.isZero())
+            return null;
+
+        if ((value = duration.getNano()) != 0) {
+            for (TimePair unit : nsUnits) {
+                if (value % unit.value != 0) {
+                    timeUnit = unit.timeUnit;
+                    break;
+                }
+                value /= unit.value;
+            }
+        } else {
+            value = duration.getSeconds();
+
+            for (TimePair unit : sUnits) {
+                if (value % unit.value != 0) {
+                    timeUnit = unit.timeUnit;
+                    break;
+                }
+                value /= unit.value;
+            }
+        }
+
+        return new TimePair(value, timeUnit);
+    }
+
     /**
      * Convert JSON node to Java properties.
      * @param propertiesNode node with properties
@@ -540,10 +640,23 @@ public class FabricConfig extends YamlConfig {
         Properties peerProperties = new Properties();
 
         if (propertiesNode != null) {
-            Iterator<String> fieldNames = propertiesNode.fieldNames();
-            while (fieldNames.hasNext()) {
-                String field = fieldNames.next();
-                peerProperties.setProperty(field, propertiesNode.get(field).asText());
+            Iterator<Map.Entry<String, JsonNode>> fields = propertiesNode.fields();
+            while (fields.hasNext()) {
+                final Map.Entry<String, JsonNode> e = fields.next();
+                final String fieldName = e.getKey();
+                final JsonNode fieldValue = e.getValue();
+                String value = fieldValue.asText();
+
+                switch (fieldName) {
+                    case "idleTimeout":
+                        /** @see Endpoint#addNettyBuilderProps for more info */
+                        final TimePair idleTimeout = parseInterval(value);
+                        peerProperties.put("grpc.NettyChannelBuilderOption.idleTimeout", new Object[]{Long.valueOf(idleTimeout.value), idleTimeout.timeUnit});
+                        break;
+                    default:
+                        peerProperties.setProperty(fieldName, fieldValue.asText());
+                        break;
+                }
             }
         }
         return peerProperties;
