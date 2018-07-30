@@ -74,12 +74,23 @@ public class NetworkManager {
 
                 //Looking for channels on peers, to find has already joined
                 Set<Peer> peersWithChannel = new HashSet<>();
+                ArrayList<Peer> ownPeers = new ArrayList<>(peerList);
                 boolean channelExists = false;
                 for (Peer peer : peerList) {
-                    Set<String> joinedChannels = hfClient.queryChannels(peer);
-                    if (joinedChannels.stream().anyMatch(installedChannelName -> installedChannelName.equalsIgnoreCase(channelName))) {
-                        channelExists = true;
-                        peersWithChannel.add(peer);
+                    try {
+                        Set<String> joinedChannels = hfClient.queryChannels(peer);
+                        if (joinedChannels.stream().anyMatch(installedChannelName -> installedChannelName.equalsIgnoreCase(channelName))) {
+                            channelExists = true;
+                            peersWithChannel.add(peer);
+                        }
+                    } catch (ProposalException ex) {
+                        if (ex.getLocalizedMessage().contains("description=access denied")) {
+                            System.err.println("Access denied exception happened while querying channels from peer " + peer.getName() + ", this is OK with external peers");
+                            peersWithChannel.add(peer);
+                            ownPeers.remove(peer);
+                            continue;
+                        }
+                        throw ex;
                     }
                 }
 
@@ -120,7 +131,7 @@ public class NetworkManager {
                 }
                 channel.initialize();
                 Set<Query.ChaincodeInfo> chaincodeInfoList = new HashSet<>();
-                for (Peer peer : peerList) {
+                for (Peer peer : ownPeers) {
                     Callable action = () -> chaincodeInfoList.addAll(channel.queryInstantiatedChaincodes(peer));
                     if (peersWithChannel.contains(peer))
                         action.call();
@@ -132,7 +143,7 @@ public class NetworkManager {
                     String chaincodeKey = jsonNode.asText();
                     ChaincodeID chaincodeID = fabricConfig.getChaincodeID(chaincodeKey);
 
-                    installChaincodes(hfClient, fabricConfig, peerList, chaincodeKey);
+                    installChaincodes(hfClient, fabricConfig, ownPeers, chaincodeKey);
                     if (chaincodeInfoList.stream().anyMatch(chaincodeInfo -> MiscUtils.equals(chaincodeID, chaincodeInfo))) {
                         System.out.println("Chaincode(" + chaincodeKey + ") was already instantiated, skipping");
                         continue;
