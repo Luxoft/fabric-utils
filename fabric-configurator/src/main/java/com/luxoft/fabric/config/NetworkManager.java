@@ -31,6 +31,17 @@ public class NetworkManager {
     static final int peerRetryCount = 5;
 
     public static void configNetwork(final FabricConfig fabricConfig) {
+        configNetwork(fabricConfig, false);
+    }
+
+    public boolean configNetwork(final FabricConfig fabricConfig, boolean skipUnauth, boolean waitChaincodes, int waitChaincodesTimeout) throws Exception {
+        configNetwork(fabricConfig, skipUnauth);
+        if (waitChaincodes)
+            return waitChaincodes(FabricConfig.createHFClient(), fabricConfig, Collections.emptySet(), waitChaincodesTimeout, skipUnauth);
+        return true;
+    }
+
+    public static void configNetwork(final FabricConfig fabricConfig, boolean skipUnauth) {
 
         Iterator<JsonNode> channels = fabricConfig.getChannels();
         if (!channels.hasNext())
@@ -77,7 +88,7 @@ public class NetworkManager {
 
                 //Looking for channels on peers, to find has already joined
                 Set<Peer> peersWithChannel = new HashSet<>();
-                ArrayList<Peer> ownPeers = new ArrayList<>(peerList);
+                List<Peer> ownPeers = new LinkedList<>(peerList);
                 boolean channelExists = false;
                 for (Peer peer : peerList) {
                     try {
@@ -87,7 +98,7 @@ public class NetworkManager {
                             peersWithChannel.add(peer);
                         }
                     } catch (ProposalException ex) {
-                        if (ex.getLocalizedMessage().contains("description=access denied")) {
+                        if (skipUnauth && ex.getLocalizedMessage().contains("description=access denied")) {
                             System.err.println("Access denied exception happened while querying channels from peer " + peer.getName() + ", this is OK with external peers");
                             peersWithChannel.add(peer);
                             ownPeers.remove(peer);
@@ -163,7 +174,7 @@ public class NetworkManager {
         }
     }
 
-    public void waitChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names, long seconds) throws Exception {
+    public boolean waitChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names, long seconds, boolean skipUnauth) throws Exception {
 
         class WaitContext {
             private final Set<String> chaincodes = new HashSet<>();
@@ -194,7 +205,7 @@ public class NetworkManager {
                 }
 
                 String chaincodeKey = jsonNode.asText();
-                wc.chaincodes.add(chaincodeKey);
+                wc.chaincodes.add(fabricConfig.getChaincodeID(chaincodeKey).getName());
             }
         }
 
@@ -212,6 +223,18 @@ public class NetworkManager {
                     final Channel channel = hfc.getChannel(channelName);
                     for (Iterator<Peer> peerIterator = wc.peers.iterator(); peerIterator.hasNext(); ) {
                         final Peer peer = peerIterator.next();
+                        if (skipUnauth) {
+                            try {
+                                hfc.queryChannels(peer);
+                            } catch (ProposalException ex) {
+                                if (ex.getLocalizedMessage().contains("description=access denied")) {
+                                    System.out.println("Access denied exception happened while querying channels from peer " + peer.getName() + ", this is OK with external peers");
+                                    peerIterator.remove();
+                                    continue;
+                                }
+                                throw ex;
+                            }
+                        }
                         final List<Query.ChaincodeInfo> chaincodeInfoList = channel.queryInstantiatedChaincodes(peer);
                         final Set<String> s = new HashSet(wc.chaincodes);
                         chaincodeInfoList.forEach((elem) -> s.remove(elem.getName()));
@@ -249,10 +272,12 @@ public class NetworkManager {
 
                     System.err.println();
                 }
-                break;
+                return false;
             }
             Thread.sleep(1000);
+            skipUnauth = false;
         }
+        return true;
     }
 
     public static void deployChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {

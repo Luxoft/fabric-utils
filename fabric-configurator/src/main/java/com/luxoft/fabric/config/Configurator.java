@@ -65,6 +65,8 @@ public class Configurator {
         OptionSpec<String> admin = parser.accepts("admin").withRequiredArg().ofType(String.class);
         OptionSpec<String> signatures = parser.accepts("signature").withRequiredArg().ofType(String.class);
         OptionSpec<Integer> timeout = parser.accepts("timeout").withOptionalArg().ofType(Integer.class).defaultsTo(60);
+        OptionSpec skipunauth = parser.accepts("skipunauth");
+        OptionSpec waitchaincodes = parser.accepts("waitchaincodes");
 
         OptionSet options = parser.parse(args);
         Arguments mode = options.valueOf(type);
@@ -73,13 +75,15 @@ public class Configurator {
             NetworkManager.configTxLator = new ConfigTxLator(options.valueOf(configtxlator));
         }
 
+        boolean success = true;
+
         NetworkManager cfg = new NetworkManager();
 
         final String configFile = options.valueOf(config);
         FabricConfig fabricConfig = FabricConfig.getConfigFromFile(configFile);
 
         if(!options.has(type) || mode.equals(Arguments.CONFIG)) {
-            cfg.configNetwork(fabricConfig);
+            success = cfg.configNetwork(fabricConfig, options.has(skipunauth), options.has(waitchaincodes), options.valueOf(timeout));
         } else if (mode.equals(Arguments.ENROLL)) {
             UserEnroller.run(fabricConfig);
         } else if (mode.equals(Arguments.GET_CHANNEL)) {
@@ -163,7 +167,9 @@ public class Configurator {
             else if (mode.equals(Arguments.UPGRADE))
                 cfg.upgradeChaincodes(hfClient, fabricConfig, names);
             else if (mode.equals(Arguments.WAIT_CHAINCODE))
-                cfg.waitChaincodes(hfClient, fabricConfig, names, options.valueOf(timeout));
+                success = cfg.waitChaincodes(hfClient, fabricConfig, names, options.valueOf(timeout), options.has(skipunauth));
         }
+
+        System.exit(success ? 0 : 1);
     }
 }
