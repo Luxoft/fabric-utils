@@ -96,14 +96,14 @@ public class MiscUtils
 
     public static <T> T runWithRetries(int maxRetries, int delaySec, Callable<T> t) throws InterruptedException {
         int count = 0;
-        RuntimeException ex = new RuntimeException("Failed to get in " + maxRetries + " times with delay " + delaySec);
+        RuntimeException ex = new RuntimeException("Failed to run " + maxRetries + " retries with delay " + delaySec);
         if (maxRetries < 0)
             maxRetries = 0;
         while (count++ <= maxRetries) {
             try {
                 return t.call();
             } catch (Exception e) {
-                ex.addSuppressed(new RuntimeException("Failed to get " + count + " time", e));
+                ex.addSuppressed(new RuntimeException("Failed to run " + count + " time", e));
                 Thread.sleep(delaySec * 1000);
             }
         }
