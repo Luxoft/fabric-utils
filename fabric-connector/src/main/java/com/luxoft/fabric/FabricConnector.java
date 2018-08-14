@@ -39,8 +39,16 @@ public class FabricConnector {
     private String defaultChannelName;
     private int defaultMaxRetries = 3;
 
+    public FabricConnector(FabricConfig fabricConfig, Boolean initChannels) throws Exception {
+        this(null, null, fabricConfig, initChannels, null);
+    }
+
     public FabricConnector(FabricConfig fabricConfig, Boolean initChannels, Options options) throws Exception {
         this(null, null, fabricConfig, initChannels, options);
+    }
+
+    public FabricConnector(FabricConfig fabricConfig) throws Exception {
+        this(null, null, fabricConfig, null);
     }
 
     public FabricConnector(FabricConfig fabricConfig, Options options) throws Exception {
@@ -71,6 +79,10 @@ public class FabricConnector {
 
     public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig, FabricConnector.Options options) throws Exception {
         this(user, defaultChannelName, fabricConfig, true, options);
+    }
+
+    public void initChannels() throws Exception {
+        initChannels(null);
     }
 
     public void initChannels(Options options) throws Exception {
