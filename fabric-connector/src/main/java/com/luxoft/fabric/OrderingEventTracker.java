@@ -502,6 +502,34 @@ public class OrderingEventTracker implements EventTracker {
             return blockProcessor;
         }
 
+        private synchronized boolean resyncBlockchain(BlockchainInfo blockchainInfo) {
+            final long currentHeight = blockchainInfo.getHeight();
+
+            if (currentHeight < nextBlockNumber) {
+                // yup!
+                long recentKnownBlock = nextBlockNumber;
+                nextBlockNumber = currentHeight; // rollback
+                setFetchPolicyLk(FetchPolicy.SLEEP); // calm down fetcher
+
+                // throw all the extra pending blocks
+                for (Iterator<Map.Entry<Long, BlockData>> iterator = blockInfoMap.entrySet().iterator(); iterator.hasNext(); ) {
+                    Map.Entry<Long, BlockData> e = iterator.next();
+
+                    final Long blockNumber = e.getKey();
+                    if (blockNumber > recentKnownBlock)
+                        recentKnownBlock = blockNumber;
+
+                    if (blockNumber >= currentHeight)
+                        iterator.remove();
+                }
+
+                logger.warn("While checking block {} blockchain has suddenly been jumped back! Block {} -> {}", nextBlockNumber, recentKnownBlock, currentHeight);
+                return true;
+            }
+
+            return false;
+        }
+
         private void fetchBlock(long blockNumber) throws FabricQueryException {
 
             final BlockData blockData;
@@ -516,8 +544,38 @@ public class OrderingEventTracker implements EventTracker {
             }
 
             logger.info("Fetch block {}", blockNumber);
-            final BlockInfo blockInfo = FabricQueryException.withGuard(() -> channel.queryBlockByNumber(blockNumber));
-            addBlock(blockInfo);
+            try {
+                final BlockInfo blockInfo = FabricQueryException.withGuard(() -> channel.queryBlockByNumber(blockNumber));
+                addBlock(blockInfo);
+            } catch (FabricQueryException ex) {
+                // try to recover if blockchain has been restored
+
+                try {
+                    final BlockchainInfo blockchainInfo = FabricQueryException.withGuard(() -> channel.queryBlockchainInfo());
+
+                    // handle rare case, when new block appear between queryBlockchainInfo() completion
+                    // and resyncBlockchain() start.
+
+                    if (resyncBlockchain(blockchainInfo)) { //
+                        final BlockchainInfo blockchainInfo1 = FabricQueryException.withGuard(() -> channel.queryBlockchainInfo());
+
+                        final long knownHeight = blockchainInfo.getHeight();
+                        final long newHeight = blockchainInfo1.getHeight();
+                        // check if we miss some blocks...
+                        if (knownHeight == newHeight) // ... no blocks missed, do nothing
+                            ex = null;
+                        else { // ... some blocks missed, force fething
+                            addBlockData(new BlockData(blockchainInfo1.getHeight()));
+                        }
+                    }
+
+                } catch (FabricQueryException e1) {
+                    ex.addSuppressed(e1);
+                }
+
+                if (ex != null)
+                    throw ex;
+            }
         }
 
         private boolean filterTransactionEvents(List<ChaincodeEvent> transactionEvents, boolean isFilteredData) {
