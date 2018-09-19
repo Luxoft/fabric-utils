@@ -304,6 +304,7 @@ public class FabricConnector {
                                     return failedFuture(t);
                             }
                         } catch (Throwable e) {
+                            e.addSuppressed(t);
                             // In case of any unexpected errors
                             return failedFuture(e);
                         }
