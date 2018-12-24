@@ -20,6 +20,8 @@
 package com.luxoft.fabric;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.luxoft.fabric.utils.ConfigGenerator;
 import com.luxoft.fabric.utils.MiscUtils;
 import org.apache.commons.io.IOUtils;
@@ -27,24 +29,19 @@ import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.hyperledger.fabric.sdk.*;
-import org.hyperledger.fabric.sdk.exception.ChaincodeEndorsementPolicyParseException;
-import org.hyperledger.fabric.sdk.exception.CryptoException;
-import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
-import org.hyperledger.fabric.sdk.exception.ProposalException;
+import org.hyperledger.fabric.sdk.exception.*;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.hyperledger.fabric_ca.sdk.HFCAClient;
 import org.hyperledger.fabric_ca.sdk.RegistrationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.json.Json;
 import java.io.*;
 import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
-import java.security.spec.InvalidKeySpecException;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -56,6 +53,7 @@ import static java.util.Objects.requireNonNull;
 
 public class FabricConfig extends YamlConfig {
 
+    public static final String COLLECTION_POLICY = "collectionPolicy";
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     private final ConfigGenerator configGenerator = new ConfigGenerator();
     private final String confDir;
@@ -181,6 +179,13 @@ public class FabricConfig extends YamlConfig {
     public String getFileName(JsonNode jsonNode, String name)
     {
         return getFileName(jsonNode, name, null);
+    }
+
+    public String getFileName(String fileName)
+    {
+        if (fileName == null || fileName.isEmpty())
+            return fileName;
+        return MiscUtils.resolveFile(fileName, confDir);
     }
 
     public User getAdmin(String key) throws Exception {
@@ -392,17 +397,23 @@ public class FabricConfig extends YamlConfig {
         installProposalRequest.setChaincodeSourceLocation(new File(chaincodePathPrefix));
         installProposalRequest.setChaincodeVersion(chaincodeVersion);
         installProposalRequest.setChaincodeLanguage(TransactionRequest.Type.valueOf(chaincodeType));
+
+        logger.info("install chaincode proposal {}:{}", chaincodeID.getName(), chaincodeID.getVersion());
         Collection<ProposalResponse> installProposalResponse = hfClient.sendInstallProposal(installProposalRequest, peerList);
 
         checkProposalResponse("install chaincode", installProposalResponse);
     }
 
-
-    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException {
-        return instantiateChaincode(hfClient, channel, key, null);
+    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException, ChaincodeCollectionConfigurationException {
+        return instantiateChaincode(hfClient, channel, key, null, null);
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key, Collection<Peer> peers) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException {
+
+    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key, JsonNode channelConfig) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException, ChaincodeCollectionConfigurationException {
+        return instantiateChaincode(hfClient, channel, key, channelConfig, null);
+    }
+
+    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key, JsonNode channelConfig, Collection<Peer> peers) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ChaincodeCollectionConfigurationException {
 
         JsonNode chaincodeParameters = getChaincodeDetails(key);
 
@@ -427,6 +438,48 @@ public class FabricConfig extends YamlConfig {
             chaincodeEndorsementPolicy.fromYamlFile(new File(endorsementPolicy));
             instantiateProposalRequest.setChaincodeEndorsementPolicy(chaincodeEndorsementPolicy);
         }
+
+
+        JsonNode collectionPolicyNode = null;
+
+        if (channelConfig != null)
+            collectionPolicyNode = channelConfig.get(COLLECTION_POLICY);
+
+        if (collectionPolicyNode == null)
+            collectionPolicyNode = chaincodeParameters.get(COLLECTION_POLICY);
+
+        if (collectionPolicyNode != null) {
+            final ChaincodeCollectionConfiguration chaincodeCollectionConfiguration;
+            if (collectionPolicyNode.isTextual() && !collectionPolicyNode.asText().isEmpty()) {
+                final String fileName = getFileName(collectionPolicyNode.asText());
+                final File file = new File(fileName);
+
+                if (fileName.endsWith(".yaml") || fileName.endsWith(".yml"))
+                    chaincodeCollectionConfiguration = ChaincodeCollectionConfiguration.fromYamlFile(file);
+                else if (fileName.endsWith(".json"))
+                    chaincodeCollectionConfiguration = ChaincodeCollectionConfiguration.fromJsonFile(file);
+                else
+                    chaincodeCollectionConfiguration = null;
+            } else if (collectionPolicyNode.isArray()) {
+
+                ObjectMapper mapper = new ObjectMapper();
+
+                // FIXME: this is not efficient, needs to find/implement better solution
+                final String s = mapper.writeValueAsString(collectionPolicyNode);
+                final javax.json.JsonArray jsonValues = Json.createReader(new StringReader(s)).readArray();
+
+                chaincodeCollectionConfiguration = ChaincodeCollectionConfiguration.fromJsonObject(jsonValues);
+            } else
+                chaincodeCollectionConfiguration = null;
+
+            if (chaincodeCollectionConfiguration == null)
+                throw new InvalidArgumentException("collectionPolicy is not if valid type");
+
+            instantiateProposalRequest.setChaincodeCollectionConfiguration(chaincodeCollectionConfiguration);
+        }
+
+
+        logger.info("instantiate chaincode proposal {}/{}:{}", channel.getName(), chaincodeID.getName(), chaincodeID.getVersion());
         Collection<ProposalResponse> instantiateProposalResponses;
         if(peers != null) {
             instantiateProposalResponses = channel.sendInstantiationProposal(instantiateProposalRequest, peers);
@@ -438,7 +491,7 @@ public class FabricConfig extends YamlConfig {
         return channel.sendTransaction(instantiateProposalResponses);
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> upgradeChaincode(HFClient hfClient, Channel channel, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException {
+    public CompletableFuture<BlockEvent.TransactionEvent> upgradeChaincode(HFClient hfClient, Channel channel, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException {
         JsonNode chaincodeParameters = getChaincodeDetails(key);
 
         List<String> chaincodeInitArguments = new ArrayList<>();
@@ -455,6 +508,7 @@ public class FabricConfig extends YamlConfig {
         installProposalRequest.setChaincodeSourceLocation(new File(chaincodePathPrefix));
         installProposalRequest.setChaincodeVersion(chaincodeVersion);
         installProposalRequest.setChaincodeLanguage(TransactionRequest.Type.valueOf(chaincodeType));
+        logger.info("install chaincode proposal {}:{}", chaincodeID.getName(), chaincodeID.getVersion());
         Collection<ProposalResponse> installProposalResponse = hfClient.sendInstallProposal(installProposalRequest, peerList);
 
         checkProposalResponse("install chaincode", installProposalResponse);
@@ -469,6 +523,7 @@ public class FabricConfig extends YamlConfig {
         tm.put("method", "UpgradeProposalRequest".getBytes(UTF_8));
         upgradeProposalRequest.setTransientMap(tm);
 
+        logger.info("upgrade chaincode proposal {}/{}:{}", channel.getName(), chaincodeID.getName(), chaincodeID.getVersion());
         Collection<ProposalResponse> upgradeProposalResponses = channel.sendUpgradeProposal(upgradeProposalRequest, peerList);
 
         checkProposalResponse("upgrade chaincode", upgradeProposalResponses);
@@ -486,14 +541,14 @@ public class FabricConfig extends YamlConfig {
         }
     }
 
-    private static PrivateKey getPrivateKeyFromBytes(byte[] data) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, InvalidKeySpecException {
+    private static PrivateKey getPrivateKeyFromBytes(byte[] data) throws IOException {
         final PEMParser pemParser = new PEMParser(new StringReader(new String(data)));
         PrivateKeyInfo pemPair = (PrivateKeyInfo) pemParser.readObject();
         PrivateKey privateKey = new JcaPEMKeyConverter().getPrivateKey(pemPair);
         return privateKey;
     }
 
-    public static Enrollment createEnrollment(InputStream privateKeyFile, InputStream certFile) throws IOException, NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException {
+    public static Enrollment createEnrollment(InputStream privateKeyFile, InputStream certFile) throws IOException {
         PrivateKey privateKey = getPrivateKeyFromBytes(IOUtils.toByteArray(privateKeyFile));
 
         return new FabricUserEnrollment(privateKey, IOUtils.toString(certFile));
@@ -584,8 +639,6 @@ public class FabricConfig extends YamlConfig {
             this.timeUnit = timeUnit;
         }
     }
-
-    ;
 
     private static TimePair parseInterval(String s) {
         final TimePair[] nsUnits = {
