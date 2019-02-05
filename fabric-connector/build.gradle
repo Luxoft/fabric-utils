@@ -21,7 +21,7 @@ repositories {
 
 dependencies {
     [ null, 'sources', 'javadoc' ].collect {
-        compile group: 'org.hyperledger.fabric-sdk-java', name: 'fabric-sdk-java', version: '1.2.2', classifier: it
+        compile group: 'org.hyperledger.fabric-sdk-java', name: 'fabric-sdk-java', version: '1.3.0', classifier: it
     }
 
     compile group: 'com.fasterxml.jackson.core', name: 'jackson-core', version: '2.8.9'

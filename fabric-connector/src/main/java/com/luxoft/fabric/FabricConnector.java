@@ -63,6 +63,10 @@ public class FabricConnector {
         this(null, defaultChannelName, fabricConfig, options);
     }
 
+    public FabricConnector(User user, String defaultChannelname, FabricConfig fabricConfig) throws Exception{
+        this(user, defaultChannelname, fabricConfig, true, null);
+    }
+
     public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig, Boolean initChannels, Options options) throws Exception {
         this.fabricConfig = fabricConfig;
         this.defaultChannelName = defaultChannelName;

@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"time"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	pb "github.com/hyperledger/fabric/protos/peer"
@@ -41,27 +42,52 @@ import (
 type SimpleChaincode struct {
 }
 
+func ensureStringIsUTF8Valid(inputString string ) string {
+    outputString := inputString
+    if !utf8.ValidString(inputString) {
+
+    		fmt.Printf("inputString is not UTF-8 valid. Converting...\n")
+
+    		v := make([]rune, 0, len(inputString))
+                    for i, r := range inputString {
+                        if r == utf8.RuneError {
+                            _, size := utf8.DecodeRuneInString(inputString[i:])
+                            if size == 1 {
+                                continue
+                            }
+                        }
+                        v = append(v, r)
+                    }
+                    outputString = string(v)
+    }
+
+   return outputString
+}
+
 // Init is a no-op
 func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
 	creator, err := stub.GetCreator();
-	fmt.Printf("Init creator: %s", string(creator[:]))
+	creatorString := ensureStringIsUTF8Valid(string(creator[:]))
+	fmt.Printf("Init creator: %s", creatorString)
+
 	if err != nil {
 		return shim.Error(fmt.Sprintf("Failed to get creator. Error: %s", err))
 	}
-	stub.PutState(string(creator[:]),[]byte("['read','write','admin']"));
-	state, err := stub.GetState(string(creator[:]));
+	stub.PutState(creatorString,[]byte("['read','write','admin']"));
+	state, err := stub.GetState(creatorString);
 	fmt.Printf("Check state: %s", string(state[:]))
 	return shim.Success(nil)
 }
 
 func checkPermission(stub shim.ChaincodeStubInterface, permission string) bool{
 	creator, err := stub.GetCreator();
-	fmt.Printf("Creator: %s", string(creator[:]))
+	creatorString := ensureStringIsUTF8Valid(string(creator[:]))
+	fmt.Printf("Creator: %s", creatorString)
 	if err != nil {
 		fmt.Printf("Failed to get creator. Error: %s", err)
 		return false;
 	}
-	state, err := stub.GetState(string(creator[:]));
+	state, err := stub.GetState(creatorString);
 	fmt.Printf("State: %s", string(state[:]))
 	return state != nil && strings.Contains(string(state[:]), permission)
 }
