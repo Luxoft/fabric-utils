@@ -4,11 +4,13 @@ version rootProject.version
 apply plugin: 'java'
 apply plugin: 'application'
 apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'maven-publish'
 
 sourceCompatibility = 1.8
 mainClassName = "com.luxoft.fabric.config.Configurator"
 
 repositories {
+    mavenLocal()
     mavenCentral()
 }
 
@@ -36,5 +38,15 @@ shadowJar {
     archiveName = "${baseName}-${classifier}.${extension}"
     manifest {
         attributes 'Main-Class': mainClassName
+    }
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId = mavenLocalGroupId            
+
+            from components.java
+        }
     }
 }

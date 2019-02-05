@@ -2,10 +2,12 @@ group 'com.luxoft'
 version rootProject.version
 
 apply plugin: 'java'
+apply plugin: 'maven-publish'
 
 sourceCompatibility = 1.8
 
 repositories {
+    mavenLocal()
     mavenCentral()
 }
 
@@ -35,4 +37,14 @@ dependencies {
 
     testCompile project(':fabric-configurator')
     testCompile group: 'junit', name: 'junit', version: '4.12'
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            groupId = mavenLocalGroupId
+
+            from components.java
+        }
+    }
 }
