@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"time"
 	"strings"
-	"unicode/utf8"
+	"net/url"
 
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	pb "github.com/hyperledger/fabric/protos/peer"
@@ -42,33 +42,11 @@ import (
 type SimpleChaincode struct {
 }
 
-func ensureStringIsUTF8Valid(inputString string ) string {
-    outputString := inputString
-    if !utf8.ValidString(inputString) {
-
-    		fmt.Printf("inputString is not UTF-8 valid. Converting...\n")
-
-    		v := make([]rune, 0, len(inputString))
-                    for i, r := range inputString {
-                        if r == utf8.RuneError {
-                            _, size := utf8.DecodeRuneInString(inputString[i:])
-                            if size == 1 {
-                                continue
-                            }
-                        }
-                        v = append(v, r)
-                    }
-                    outputString = string(v)
-    }
-
-   return outputString
-}
-
 // Init is a no-op
 func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
 	creator, err := stub.GetCreator();
-	creatorString := ensureStringIsUTF8Valid(string(creator[:]))
-	fmt.Printf("Init creator: %s", creatorString)
+	creatorString := url.PathEscape(string(creator[:]))
+	fmt.Printf("Init creator: %s\n", creatorString)
 
 	if err != nil {
 		return shim.Error(fmt.Sprintf("Failed to get creator. Error: %s", err))
@@ -80,9 +58,11 @@ func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
 }
 
 func checkPermission(stub shim.ChaincodeStubInterface, permission string) bool{
+
+    fmt.Printf("Checking permissions\n")
 	creator, err := stub.GetCreator();
-	creatorString := ensureStringIsUTF8Valid(string(creator[:]))
-	fmt.Printf("Creator: %s", creatorString)
+	creatorString := url.PathEscape(string(creator[:]))
+	fmt.Printf("Creator: %s\n", creatorString)
 	if err != nil {
 		fmt.Printf("Failed to get creator. Error: %s", err)
 		return false;
@@ -96,6 +76,8 @@ func checkPermission(stub shim.ChaincodeStubInterface, permission string) bool{
 // put - takes two arguments, a key and value, and stores them in the state
 // remove - takes one argument, a key, and removes if from the state
 func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
+
+    fmt.Printf("Invoking\n")
 	function, args := stub.GetFunctionAndParameters()
 	switch function {
 	case "put":
