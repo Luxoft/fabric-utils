@@ -43,7 +43,7 @@ public class FabricConnectorIntegrationTest {
 
         // Configuring Fabric network
         NetworkManager.configNetwork(fabricConfig);
-        LOG.info("Finished preparation preparation");
+        LOG.info("Finished preparation");
     }
 
     @AfterClass
