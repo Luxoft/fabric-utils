@@ -33,6 +33,9 @@ public class FabricConnectorIntegrationTest {
     public static void setUp() throws Exception {
         LOG.info("Starting preparation");
         int exitCode = execInDirectory("./fabric.sh restart", "../files/artifacts/");
+
+        LOG.info("Waiting some time to give network the time to initialize");
+        Thread.sleep(5000);
         LOG.info("Restarted network");
         Assert.assertEquals(0, exitCode);
 

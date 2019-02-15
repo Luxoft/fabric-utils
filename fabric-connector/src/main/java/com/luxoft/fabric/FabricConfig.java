@@ -423,7 +423,7 @@ public class FabricConfig extends YamlConfig {
         chaincodeParameters.withArray("initArguments").forEach(element -> chaincodeInitArguments.add(element.asText()));
 
         InstantiateProposalRequest instantiateProposalRequest = hfClient.newInstantiationProposalRequest();
-        instantiateProposalRequest.setProposalWaitTime(60000);
+        instantiateProposalRequest.setProposalWaitTime(120000);
         instantiateProposalRequest.setChaincodeID(chaincodeID);
         instantiateProposalRequest.setFcn("init");
         instantiateProposalRequest.setArgs(chaincodeInitArguments.stream().toArray(String[]::new));
@@ -516,7 +516,7 @@ public class FabricConfig extends YamlConfig {
         UpgradeProposalRequest upgradeProposalRequest = hfClient.newUpgradeProposalRequest();
         upgradeProposalRequest.setChaincodeID(chaincodeID);
         upgradeProposalRequest.setChaincodeVersion(chaincodeVersion);
-        upgradeProposalRequest.setProposalWaitTime(60000);
+        upgradeProposalRequest.setProposalWaitTime(120000);
         upgradeProposalRequest.setArgs(chaincodeInitArguments.stream().toArray(String[]::new));
         Map<String, byte[]> tm = new HashMap<>();
         tm.put("HyperLedgerFabric", "UpgradeProposalRequest:JavaSDK".getBytes(UTF_8));
