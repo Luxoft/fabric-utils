@@ -45,12 +45,13 @@ type SimpleChaincode struct {
 // Init is a no-op
 func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
 	creator, err := stub.GetCreator();
-	creatorString := url.PathEscape(string(creator[:]))
-	fmt.Printf("Init creator: %s\n", creatorString)
 
 	if err != nil {
 		return shim.Error(fmt.Sprintf("Failed to get creator. Error: %s", err))
 	}
+	creatorString := url.PathEscape(string(creator[:]))
+    fmt.Printf("Init creator: %s\n", creatorString)
+
 	stub.PutState(creatorString,[]byte("['read','write','admin']"));
 	state, err := stub.GetState(creatorString);
 	fmt.Printf("Check state: %s", string(state[:]))
@@ -61,12 +62,13 @@ func checkPermission(stub shim.ChaincodeStubInterface, permission string) bool{
 
     fmt.Printf("Checking permissions\n")
 	creator, err := stub.GetCreator();
-	creatorString := url.PathEscape(string(creator[:]))
-	fmt.Printf("Creator: %s\n", creatorString)
 	if err != nil {
 		fmt.Printf("Failed to get creator. Error: %s", err)
 		return false;
 	}
+	creatorString := url.PathEscape(string(creator[:]))
+    fmt.Printf("Creator: %s\n", creatorString)
+
 	state, err := stub.GetState(creatorString);
 	fmt.Printf("State: %s", string(state[:]))
 	return state != nil && strings.Contains(string(state[:]), permission)
@@ -351,10 +353,8 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 			fmt.Printf("Failed to get creator. Error: %s", err)
 			return shim.Error(fmt.Sprintf("Failed to get creator. Error: %s", err));
 		}
-
-		creatorString := url.PathEscape(string(creator[:]))
 		
-		value = creatorString
+		value = creator
 
 		if err := stub.PutState(key, value); err != nil {
 			fmt.Printf("Error putting state %s", err)
