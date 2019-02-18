@@ -351,8 +351,10 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 			fmt.Printf("Failed to get creator. Error: %s", err)
 			return shim.Error(fmt.Sprintf("Failed to get creator. Error: %s", err));
 		}
+
+		creatorString := url.PathEscape(string(creator[:]))
 		
-		value = creator
+		value = creatorString
 
 		if err := stub.PutState(key, value); err != nil {
 			fmt.Printf("Error putting state %s", err)
