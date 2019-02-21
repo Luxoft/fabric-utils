@@ -1,2 +1,35 @@
 group 'com.luxoft'
-version '1.2.20'
+version '1.4.0'
+ext.mavenLocalGroupId = 'com.github.Luxoft'
+
+apply plugin: 'maven-publish'
+
+
+
+publishing {
+
+    publications {
+        maven(MavenPublication) {
+            groupId = mavenLocalGroupId
+
+            pom.withXml {
+                asNode().appendNode('dependencies')
+                            .appendNode('dependency')
+                                .appendNode('groupId', mavenLocalGroupId).parent()
+                                .appendNode('artifactId','fabric-connector').parent()
+                                .appendNode('version',version).parent()
+                                .parent()
+                            .appendNode('dependency')
+                                .appendNode('groupId',mavenLocalGroupId).parent()
+                                .appendNode('artifactId','fabric-configurator').parent()
+                                .appendNode('version',version)
+
+            }
+        }
+    }
+}
+
+
+
+
+

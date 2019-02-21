@@ -15,6 +15,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.Assert.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 /**
  * Integration tests for Fabric connector
@@ -24,16 +27,23 @@ import static org.junit.Assert.*;
 public class FabricConnectorIntegrationTest {
 
     private static FabricConfig fabricConfig;
+    private static final Logger LOG = LoggerFactory.getLogger(FabricConnectorIntegrationTest.class);
 
     @BeforeClass
     public static void setUp() throws Exception {
+        LOG.info("Starting preparation");
         int exitCode = execInDirectory("./fabric.sh restart", "../files/artifacts/");
+
+        LOG.info("Waiting some time to give network the time to initialize");
+        Thread.sleep(5000);
+        LOG.info("Restarted network");
         Assert.assertEquals(0, exitCode);
 
         fabricConfig = FabricConfig.getConfigFromFile("../files/fabric.yaml");
 
         // Configuring Fabric network
         NetworkManager.configNetwork(fabricConfig);
+        LOG.info("Finished preparation");
     }
 
     @AfterClass
@@ -46,6 +56,7 @@ public class FabricConnectorIntegrationTest {
      */
     @Test
     public void testSanityCheck() throws Exception {
+        LOG.info("Starting SanityCheck");
         FabricConnector fabricConnector = new FabricConnector(fabricConfig);
 
         byte[] key = "someKey".getBytes();
@@ -58,10 +69,12 @@ public class FabricConnectorIntegrationTest {
         CompletableFuture<byte[]> queryFuture = fabricConnector.query(
                 "get", "mychcode", "mychannel", key);
         Assert.assertArrayEquals(value, queryFuture.get());
+        LOG.info("Finished SanityCheck");
     }
 
     @Test
     public void testTxRace() throws Exception {
+        LOG.info("Starting testTxRace");
         FabricConnector fabricConnector = new FabricConnector(fabricConfig);
 
         AtomicInteger success = new AtomicInteger();
@@ -107,6 +120,7 @@ public class FabricConnectorIntegrationTest {
         // Its race so anyone can finish first
         assertTrue(finalValue.equals(value1) || finalValue.equals(value2));
         assertEquals(2, success.get());
+        LOG.info("Finished testTxRace");
     }
 
     private static int execInDirectory(String cmd, String dir) {

@@ -154,7 +154,9 @@ public class NetworkManager {
                 }
 
                 for (JsonNode jsonNode : channelParameters.get("chaincodes")) {
-                    String chaincodeKey = jsonNode.asText();
+                    String chaincodeKey = getChaincodeReference(jsonNode);
+                    final JsonNode channelSpecificConfig = getChannelSpecificConfig(jsonNode);
+
                     ChaincodeID chaincodeID = fabricConfig.getChaincodeID(chaincodeKey);
 
                     installChaincodes(hfClient, fabricConfig, ownPeers, chaincodeKey);
@@ -163,7 +165,7 @@ public class NetworkManager {
                         continue;
                     }
                     try {
-                        fabricConfig.instantiateChaincode(hfClient, channel, chaincodeKey).get();
+                        fabricConfig.instantiateChaincode(hfClient, channel, chaincodeKey, channelSpecificConfig).get();
                     } catch (Exception e) {
                         e.printStackTrace();
                     }
@@ -199,7 +201,7 @@ public class NetworkManager {
             wc.peers.addAll(channel.getPeers());
 
             for (JsonNode jsonNode : channelObject.getValue().get("chaincodes")) {
-                String chaincodeName = jsonNode.asText();
+                String chaincodeName = getChaincodeReference(jsonNode);
                 if (!names.isEmpty()) {
                     if (!names.contains(chaincodeName)) continue;
                 }
@@ -297,16 +299,17 @@ public class NetworkManager {
             final List<Peer> peers = new ArrayList<>(channel.getPeers());
 
             for (JsonNode jsonNode : channelObject.getValue().get("chaincodes")) {
-                String chaincodeName = jsonNode.asText();
-                if (!names.isEmpty()) {
-                    if (!names.contains(chaincodeName)) continue;
-                }
+                final String chaincodeKey = getChaincodeReference(jsonNode);
+                final JsonNode channelConfig = getChannelSpecificConfig(jsonNode);
 
-                String chaincodeKey = jsonNode.asText();
+                if (!names.isEmpty()) {
+                    if (!names.contains(chaincodeKey))
+                        continue;
+                }
 
                 installChaincodes(hfc, fabricConfig, peers, chaincodeKey);
 
-                fabricConfig.instantiateChaincode(hfc, channel, chaincodeKey).get();
+                fabricConfig.instantiateChaincode(hfc, channel, chaincodeKey, channelConfig).get();
             }
         }
     }
@@ -434,5 +437,20 @@ public class NetworkManager {
                 }
             }
         }
+    }
+
+    private static String getChaincodeReference(JsonNode jsonNode) {
+        String chaincodeKey;
+
+        if (jsonNode.isTextual())
+            chaincodeKey = jsonNode.asText();
+        else
+            chaincodeKey = jsonNode.get("name").asText();
+
+        return chaincodeKey;
+    }
+
+    private static JsonNode getChannelSpecificConfig(JsonNode jsonNode) {
+        return (jsonNode.isTextual()) ? null : jsonNode;
     }
 }
