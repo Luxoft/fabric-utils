@@ -3,6 +3,7 @@ package com.luxoft.fabric.config;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.FabricConfig;
 import com.luxoft.fabric.FabricConnector;
+import com.luxoft.fabric.model.ConfigData;
 import com.luxoft.fabric.utils.MiscUtils;
 import org.hyperledger.fabric.protos.common.Common;
 import org.hyperledger.fabric.protos.common.Configtx;
@@ -18,6 +19,8 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.Callable;
 
+import static com.luxoft.fabric.FabricConfig.getOrDefault;
+import static com.luxoft.fabric.FabricConfig.getOrThrow;
 import static com.luxoft.fabric.utils.MiscUtils.runWithRetries;
 
 /**
@@ -43,48 +46,23 @@ public class NetworkManager {
 
     public static void configNetwork(final FabricConfig fabricConfig, boolean skipUnauth) {
 
-        Iterator<JsonNode> channels = fabricConfig.getChannels();
-        if (!channels.hasNext())
+        Map<String, ConfigData.Channel> channels = fabricConfig.getChannels();
+        if (channels.isEmpty())
             throw new RuntimeException("Need at least one channel to do some work");
 
-        while (channels.hasNext()) {
-            Map.Entry<String, JsonNode> channelObject = channels.next().fields().next();
+        for (Map.Entry<String, ConfigData.Channel> channelObject : channels.entrySet()) {
             String channelName = channelObject.getKey();
-            JsonNode channelParameters = channelObject.getValue();
+            ConfigData.Channel channelParameters = channelObject.getValue();
             try {
-                String adminKey = channelParameters.get("admin").asText();
+                String adminKey = getOrThrow(channelParameters.admin, String.format("channel[%s].admin", channelName));
                 final User fabricUser = fabricConfig.getAdmin(adminKey);
 
                 HFClient hfClient = FabricConfig.createHFClient();
                 hfClient.setUserContext(fabricUser);
 
-                Iterator<JsonNode> orderers = channelParameters.path("orderers").iterator();
-                if (!orderers.hasNext())
-                    throw new RuntimeException("Orderers list can`t be empty");
-                List<Orderer> ordererList = new ArrayList<>();
-                while (orderers.hasNext()) {
-                    String ordererKey = orderers.next().asText();
-                    Orderer orderer = fabricConfig.getNewOrderer(hfClient, ordererKey);
-                    ordererList.add(orderer);
-                }
-
-                Iterator<JsonNode> peers = channelParameters.path("peers").iterator();
-                if (!peers.hasNext())
-                    throw new RuntimeException("Peers list can`t be empty");
-                List<Peer> peerList = new ArrayList<>();
-                while (peers.hasNext()) {
-                    String peerKey = peers.next().asText();
-                    Peer peer = fabricConfig.getNewPeer(hfClient, peerKey);
-                    peerList.add(peer);
-                }
-
-                Iterator<JsonNode> eventhubs = channelParameters.path("eventhubs").iterator();
-                List<EventHub> eventhubList = new ArrayList<>();
-                while (eventhubs.hasNext()) {
-                    String eventhubKey = eventhubs.next().asText();
-                    EventHub eventhub = fabricConfig.getNewEventhub(hfClient, eventhubKey);
-                    eventhubList.add(eventhub);
-                }
+                final List<Orderer> ordererList = fabricConfig.getOrdererList(hfClient, channelParameters);
+                final List<Peer> peerList = fabricConfig.getPeerList(hfClient, channelParameters);
+                final List<EventHub> eventhubList = fabricConfig.getEventHubList(hfClient, channelParameters);
 
                 //Looking for channels on peers, to find has already joined
                 Set<Peer> peersWithChannel = new HashSet<>();
@@ -110,7 +88,7 @@ public class NetworkManager {
 
                 boolean newChannel = false;
                 Channel channelObj;
-                String txFile = fabricConfig.getFileName(channelParameters, "txFile");
+                String txFile = fabricConfig.getFileName(channelParameters.txFile);
                 if (!channelExists && txFile != null) {
                     try {
                         ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
@@ -153,9 +131,12 @@ public class NetworkManager {
                         runWithRetries(peerRetryCount, peerRetryDelaySec, action);
                 }
 
-                for (JsonNode jsonNode : channelParameters.get("chaincodes")) {
-                    String chaincodeKey = getChaincodeReference(jsonNode);
-                    final JsonNode channelSpecificConfig = getChannelSpecificConfig(jsonNode);
+                final List<ConfigData.ChannelChaincode> chaincodes = getOrDefault(channelParameters.chaincodes, Collections.emptyList());
+                for (ConfigData.ChannelChaincode channelChaincode : chaincodes) {
+
+                    final String chaincodeKey = channelChaincode.name;
+                    try {
+                        final JsonNode channelSpecificConfig = channelChaincode.collectionPolicy;
 
                     ChaincodeID chaincodeID = fabricConfig.getChaincodeID(chaincodeKey);
 
@@ -168,6 +149,9 @@ public class NetworkManager {
                         fabricConfig.instantiateChaincode(hfClient, channel, chaincodeKey, channelSpecificConfig).get();
                     } catch (Exception e) {
                         e.printStackTrace();
+                        }
+                    } catch (Exception e) {
+                        throw new RuntimeException(String.format("Unable to process chaincode '%d'", chaincodeKey), e);
                     }
                 }
             } catch (Exception e) {
@@ -184,13 +168,13 @@ public class NetworkManager {
         }
 
         Map<String, WaitContext> waitContext = new HashMap<>();
-        Iterator<JsonNode> channels = fabricConfig.getChannels();
-        while (channels.hasNext()) {
-            Map.Entry<String, JsonNode> channelObject = channels.next().fields().next();
+        Map<String, ConfigData.Channel> channels = getOrDefault(fabricConfig.getChannels(), Collections.emptyMap());
 
+        for (Map.Entry<String, ConfigData.Channel> channelObject : channels.entrySet()) {
             String channelName = channelObject.getKey();
+            ConfigData.Channel channelValue = channelObject.getValue();
 
-            String adminKey = channelObject.getValue().get("admin").asText();
+            String adminKey = getOrThrow(channelValue.admin, String.format("chaincode[%s].admin", channelName));
             final User fabricUser = fabricConfig.getAdmin(adminKey);
             hfc.setUserContext(fabricUser);
 
@@ -200,14 +184,15 @@ public class NetworkManager {
 
             wc.peers.addAll(channel.getPeers());
 
-            for (JsonNode jsonNode : channelObject.getValue().get("chaincodes")) {
-                String chaincodeName = getChaincodeReference(jsonNode);
+            final List<ConfigData.ChannelChaincode> channelChaincodes = getOrDefault(channelValue.chaincodes, Collections.emptyList());
+            for (ConfigData.ChannelChaincode channelChaincode : channelChaincodes) {
+                final String chaincodeName = getOrThrow(channelChaincode.name, String.format("channel[%s].chaincode[?].name", channelName));
                 if (!names.isEmpty()) {
-                    if (!names.contains(chaincodeName)) continue;
+                    if (!names.contains(chaincodeName))
+                        continue;
                 }
 
-                String chaincodeKey = jsonNode.asText();
-                wc.chaincodes.add(fabricConfig.getChaincodeID(chaincodeKey).getName());
+                wc.chaincodes.add(fabricConfig.getChaincodeID(chaincodeName).getName());
             }
         }
 
@@ -284,13 +269,12 @@ public class NetworkManager {
 
     public static void deployChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {
 
-        Iterator<JsonNode> channels = fabricConfig.getChannels();
-        while (channels.hasNext()) {
-            Map.Entry<String, JsonNode> channelObject = channels.next().fields().next();
+        Map<String, ConfigData.Channel> channels = fabricConfig.getChannels();
+        for (Map.Entry<String, ConfigData.Channel> channelEntry : channels.entrySet()) {
+            final String channelName = channelEntry.getKey();
+            final ConfigData.Channel channelInfo = channelEntry.getValue();
 
-            String channelName = channelObject.getKey();
-
-            String adminKey = channelObject.getValue().get("admin").asText();
+            String adminKey = getOrThrow(channelInfo.admin, String.format("channels[%s].admin", channelName));
             final User fabricUser = fabricConfig.getAdmin(adminKey);
             hfc.setUserContext(fabricUser);
 
@@ -298,40 +282,42 @@ public class NetworkManager {
             final Channel channel = hfc.getChannel(channelName);
             final List<Peer> peers = new ArrayList<>(channel.getPeers());
 
-            for (JsonNode jsonNode : channelObject.getValue().get("chaincodes")) {
-                final String chaincodeKey = getChaincodeReference(jsonNode);
-                final JsonNode channelConfig = getChannelSpecificConfig(jsonNode);
+            final List<ConfigData.ChannelChaincode> channelChaincodes = getOrDefault(channelInfo.chaincodes, Collections.emptyList());
+            for (ConfigData.ChannelChaincode channelChaincode : channelChaincodes) {
+                final String chaincodeName = getOrThrow(channelChaincode.name, String.format("channels[%s].chaincodes[?].name", channelName));
+                final JsonNode channelConfig = channelChaincode.collectionPolicy;
 
                 if (!names.isEmpty()) {
-                    if (!names.contains(chaincodeKey))
+                    if (!names.contains(chaincodeName))
                         continue;
                 }
 
-                installChaincodes(hfc, fabricConfig, peers, chaincodeKey);
-
-                fabricConfig.instantiateChaincode(hfc, channel, chaincodeKey, channelConfig).get();
+                installChaincodes(hfc, fabricConfig, peers, chaincodeName);
+                fabricConfig.instantiateChaincode(hfc, channel, chaincodeName, null).get();
             }
         }
     }
 
     public static void upgradeChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {
 
-        Iterator<JsonNode> channels = fabricConfig.getChannels();
-        while (channels.hasNext()) {
-            Map.Entry<String, JsonNode> channelObject = channels.next().fields().next();
+        Map<String, ConfigData.Channel> channels = fabricConfig.getChannels();
+        for (Map.Entry<String, ConfigData.Channel> channelEntry : channels.entrySet()) {
 
-            String channelName = channelObject.getKey();
+            String channelName = channelEntry.getKey();
+            ConfigData.Channel channelInfo = channelEntry.getValue();
 
-            String adminKey = channelObject.getValue().get("admin").asText();
+            String adminKey = getOrThrow(channelInfo.admin, String.format("channel[%s].admin", channelName));
             final User fabricUser = fabricConfig.getAdmin(adminKey);
             hfc.setUserContext(fabricUser);
 
             fabricConfig.getChannel(hfc, channelName, null);
 
-            for (JsonNode jsonNode : channelObject.getValue().get("chaincodes")) {
-                String chaincodeName = jsonNode.asText();
+            final List<ConfigData.ChannelChaincode> channelChaincodes = getOrDefault(channelInfo.chaincodes, Collections.emptyList());
+            for (ConfigData.ChannelChaincode channelChaincode : channelChaincodes) {
+                String chaincodeName = channelChaincode.name;
                 if (!names.isEmpty()) {
-                    if (!names.contains(chaincodeName)) continue;
+                    if (!names.contains(chaincodeName))
+                        continue;
                 }
 
                 Channel channel = hfc.getChannel(channelName);
@@ -437,20 +423,5 @@ public class NetworkManager {
                 }
             }
         }
-    }
-
-    private static String getChaincodeReference(JsonNode jsonNode) {
-        String chaincodeKey;
-
-        if (jsonNode.isTextual())
-            chaincodeKey = jsonNode.asText();
-        else
-            chaincodeKey = jsonNode.get("name").asText();
-
-        return chaincodeKey;
-    }
-
-    private static JsonNode getChannelSpecificConfig(JsonNode jsonNode) {
-        return (jsonNode.isTextual()) ? null : jsonNode;
     }
 }

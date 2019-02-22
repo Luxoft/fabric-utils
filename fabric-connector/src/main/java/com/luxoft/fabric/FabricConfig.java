@@ -19,9 +19,10 @@
 
 package com.luxoft.fabric;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.*;
+import com.luxoft.fabric.model.ConfigData;
+import com.luxoft.fabric.model.FileReference;
+import com.luxoft.fabric.model.jackson.ConfigModule;
 import com.luxoft.fabric.utils.ConfigGenerator;
 import com.luxoft.fabric.utils.MiscUtils;
 import org.apache.commons.io.IOUtils;
@@ -39,24 +40,25 @@ import org.slf4j.LoggerFactory;
 import javax.json.Json;
 import java.io.*;
 import java.net.MalformedURLException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.PrivateKey;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
-public class FabricConfig extends YamlConfig {
+public class FabricConfig {
 
-    public static final String COLLECTION_POLICY = "collectionPolicy";
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     private final ConfigGenerator configGenerator = new ConfigGenerator();
     private final String confDir;
+    private final ConfigData.Root config;
 
     static {
         //loading Fabric security provider to the system
@@ -76,16 +78,28 @@ public class FabricConfig extends YamlConfig {
     }
 
     public FabricConfig(Reader configReader, String confDir) throws IOException {
-        super(configReader);
         this.confDir = confDir == null ? "." : confDir;
+        if (configReader == null) {
+            config = null;
+        } else {
+            ObjectMapper mapper = new ObjectMapper();
+            final YamlConfig yamlConfig = new YamlConfig(configReader);
+            final JsonNode root = yamlConfig.getRoot();
+            ConfigModule.configure(mapper);
+            config = mapper.treeToValue(root, ConfigData.Root.class);
+        }
     }
 
-    public Iterator<JsonNode> getChannels() {
-        JsonNode channels = getRoot().get("channels");
-        if (channels != null)
-            return channels.elements();
+    public ConfigData.Root getRoot() {
+        return config;
+    }
+
+    public Map<String, ConfigData.Channel> getChannels() {
+        final Map<String, ConfigData.Channel> channels = getRoot().channels;
+        if (channels == null)
+            return Collections.emptyMap();
         else
-            return Collections.emptyIterator();
+            return channels;
     }
 
     public static HFClient createHFClient() throws CryptoException, InvalidArgumentException {
@@ -95,186 +109,201 @@ public class FabricConfig extends YamlConfig {
         return hfClient;
     }
 
-    public JsonNode getChannelDetails(String key) {
-        return getRoot().withArray("channels").findValue(key);
+    public ConfigData.Channel getChannelDetails(String key) {
+        return getRoot().channels.get(key);
     }
 
-    public JsonNode getPeerDetails(String key) {
-        return getRoot().get("peers").findValue(key);
+    public ConfigData.Peer getPeerDetails(String key) {
+        return getRoot().peers.get(key);
     }
 
-    protected List<String> getElementKeys(String elementName) {
-        Set<String> names = new HashSet<>();
-        JsonNode elements = getRoot().get(elementName);
-        if (elements == null)
-            return Collections.EMPTY_LIST;
-        elements.iterator().forEachRemaining(element -> names.add(element.fieldNames().next()));
-        return new ArrayList(names);
+    protected List<String> getElementKeys(Map<String, ?> collection) {
+        if (collection == null)
+            return Collections.emptyList();
+        return new LinkedList<>(collection.keySet());
     }
 
     public List<String> getPeersKeys() {
-        return getElementKeys("peers");
+        return getElementKeys(getRoot().peers);
     }
 
     public List<String> getOrderersKeys() {
-        return getElementKeys("orderers");
+        return getElementKeys(getRoot().orderers);
     }
 
     public List<String> getEventHubsKeys() {
-        return getElementKeys("eventhubs");
+        return getElementKeys(getRoot().eventhubs);
     }
 
     public List<String> getChaincodesKeys() {
-        return getElementKeys("chaincodes");
+        return getElementKeys(getRoot().chaincodes);
     }
 
     public List<String> getChannelsKeys() {
-        return getElementKeys("channels");
+        return getElementKeys(getRoot().channels);
     }
 
     public List<String> getCAsKeys() {
-        return getElementKeys("cas");
+        return getElementKeys(getRoot().cas);
     }
 
     public List<String> getAdminsKeys() {
-        return getElementKeys("admins");
+        return getElementKeys(getRoot().admins);
     }
 
-    public JsonNode getEventhubDetails(String key) {
-        return getRoot().get("eventhubs").findValue(key);
+    public ConfigData.Eventhub getEventhubDetails(String key) {
+        return getRoot().eventhubs.get(key);
     }
 
-    public JsonNode getOrdererDetails(String key) {
-        return getRoot().get("orderers").findValue(key);
+    public ConfigData.Orderer getOrdererDetails(String key) {
+        return getRoot().orderers.get(key);
     }
 
-    public JsonNode getChaincodeDetails(String key) {
-        return getRoot().get("chaincodes").findValue(key);
+    public ConfigData.Chaincode getChaincodeDetails(String key) {
+        return getRoot().chaincodes.get(key);
     }
 
-    public JsonNode getAdminDetails(String key) {
-        return getRoot().get("admins").findValue(key);
+    public ConfigData.Admin getAdminDetails(String key) {
+        return getRoot().admins.get(key);
     }
 
-    public JsonNode getCADetails(String key) {
-        return getRoot().get("cas").findValue(key);
+    public ConfigData.CA getCADetails(String key) {
+        return getRoot().cas.get(key);
     }
 
-    public JsonNode getUsersDetails() {
-        return getRoot().get("users");
+    public ConfigData.Users getUsersDetails() {
+        return getRoot().users;
     }
 
-    public String getFileName(JsonNode jsonNode, String name, String defaultValue) {
-        final JsonNode node = jsonNode.get(name);
-        String value = defaultValue;
-        if (node == null) {
+    public String getFileName(FileReference fileReference, String defaultValue) {
+        String value;
+        if (fileReference == null) {
             if (defaultValue == null || defaultValue.isEmpty())
                 return defaultValue;
-        }
-        else
-            value = node.asText();
+            value = defaultValue;
+        } else
+            value = fileReference.asString();
         return MiscUtils.resolveFile(value, confDir);
     }
 
-    public String getFileName(JsonNode jsonNode, String name)
-    {
-        return getFileName(jsonNode, name, null);
-    }
-
-    public String getFileName(String fileName)
-    {
-        if (fileName == null || fileName.isEmpty())
-            return fileName;
-        return MiscUtils.resolveFile(fileName, confDir);
+    public String getFileName(FileReference fileReference) {
+        return getFileName(fileReference, null);
     }
 
     public User getAdmin(String key) throws Exception {
-        JsonNode adminParameters = requireNonNull(getAdminDetails(key));
+        ConfigData.Admin adminParameters = requireNonNull(getAdminDetails(key));
 
-        String adminName = adminParameters.get("name").asText();
-        String adminMspID = adminParameters.get("mspID").asText();
-        String adminCert = getFileName(adminParameters, "cert");
-        String adminPrivateKey = getFileName(adminParameters, "privateKey");
+        String adminName = adminParameters.name;
+        String adminMspID = adminParameters.mspID;
+        String adminCert = getFileName(adminParameters.cert);
+        String adminPrivateKey = getFileName(adminParameters.privateKey);
 
         Enrollment enrollment = FabricConfig.createEnrollment(new FileInputStream(adminPrivateKey), new FileInputStream(adminCert));
         return new FabricUser(adminName, null, null, enrollment, adminMspID);
     }
 
+    public User getFabricUser(String userName) throws IOException {
+        ConfigData.Users usersDetails = getUsersDetails();
+        if (usersDetails == null)
+            throw new RuntimeException("User details not found");
+
+        String destFilesRootPath = getOrDefault(usersDetails.destFilesPath, "users/");
+        String privateKeyFileName = getOrDefault(usersDetails.privateKeyFileName, "pk.pem");
+        String certFileName = getOrDefault(usersDetails.certFileName, "cert.pem");
+
+        final FileReference keyFileReference = new FileReference(Paths.get(destFilesRootPath, userName, privateKeyFileName).toString());
+        final FileReference certFileReference = new FileReference(Paths.get(destFilesRootPath, userName, certFileName).toString());
+
+        final File keyfile = new File(getFileName(keyFileReference));
+        final File certfile = new File(getFileName(certFileReference));
+
+        final String pemPrivateKey = new String(Files.readAllBytes(keyfile.toPath()), StandardCharsets.UTF_8);
+        final String pemCertificate = new String(Files.readAllBytes(certfile.toPath()), StandardCharsets.UTF_8);
+
+        return getFabricUser(userName, pemPrivateKey, pemCertificate, null);
+    }
+
+    public static User getFabricUser(String name, String pemPrivateKey, String cert, String mspId) throws IOException {
+        final Enrollment enrollment = createEnrollment(pemPrivateKey, cert);
+        return new FabricUser(name, null, null, enrollment, mspId);
+    }
+
+    private void updatePemFile(Properties properties, FileReference pemFileReference) {
+        final String PEMFILE_PROP = "pemFile";
+
+        if (properties.getProperty(PEMFILE_PROP) == null && pemFileReference != null) {
+            properties.setProperty(PEMFILE_PROP, getFileName(pemFileReference));
+        }
+    }
+
     /**
      * Create new orderer using fabric.yaml. Properties for orderer can be defined by corresponding key.
      * List of supported properties:
-     * @see HFClient#newOrderer(String, String, Properties)
      *
      * @param hfClient Hyperledger Fabric client
-     * @param key key of the orderer in fabric.yaml
-     *
+     * @param key      key of the orderer in fabric.yaml
      * @return the orderer
      * @throws InvalidArgumentException throws by SDK in case of exception
+     * @see HFClient#newOrderer(String, String, Properties)
      */
     public Orderer getNewOrderer(HFClient hfClient, String key) throws InvalidArgumentException {
-        JsonNode ordererParameters = requireNonNull(getOrdererDetails(key));
+        ConfigData.Orderer ordererParameters = requireNonNull(getOrdererDetails(key));
 
-        String ordererUrl = ordererParameters.get("url").asText();
-        String ordererPemFile = getFileName(ordererParameters, "pemFile", "");
+        String ordererUrl = getOrThrow(ordererParameters.url, String.format("orderer[%s].url", key));
+        Properties properties = mapToProperties(ordererParameters.properties);
+        updatePemFile(properties, ordererParameters.pemFile);
 
-        Properties ordererProperties = jsonToProperties(ordererParameters.get("properties"));
-        ordererProperties.setProperty("pemFile", ordererPemFile);
+        logger.info("Creating Orderer with props: {}", properties);
 
-        logger.info("Creating Orderer with props: {}", ordererProperties);
-
-        return hfClient.newOrderer(key, ordererUrl, ordererProperties);
+        return hfClient.newOrderer(key, ordererUrl, properties);
     }
 
     /**
      * Create new peer using fabric.yaml. Properties for peer can be defined by corresponding key.
      * List of supported properties:
-     * @see HFClient#newPeer(String, String, Properties)
      *
      * @param hfClient Hyperledger Fabric client
-     * @param key key of the peer in fabric.yaml
-     *
+     * @param key      key of the peer in fabric.yaml
      * @return the peer
      * @throws InvalidArgumentException throws by SDK in case of exception
+     * @see HFClient#newPeer(String, String, Properties)
      */
     public Peer getNewPeer(HFClient hfClient, String key) throws InvalidArgumentException {
-        JsonNode peerParameters = requireNonNull(getPeerDetails(key));
+        ConfigData.Peer peerParameters = requireNonNull(getPeerDetails(key));
 
-        String peerUrl = peerParameters.get("url").asText();
-        String peerName = peerParameters.path("name").asText(key);
-        String peerPemFile = getFileName(peerParameters, "pemFile", "");
+        String peerUrl = getOrThrow(peerParameters.url, String.format("peer[%s].url", key));
+        String peerName = getOrDefault(peerParameters.name, key);
 
-        Properties peerProperties = jsonToProperties(peerParameters.get("properties"));
-        peerProperties.setProperty("pemFile", peerPemFile);
+        Properties properties = mapToProperties(peerParameters.properties);
+        updatePemFile(properties, peerParameters.pemFile);
 
-        logger.info("Creating Peer with props: {}", peerProperties);
+        logger.info("Creating Peer with props: {}", properties);
 
-        return hfClient.newPeer(peerName, peerUrl, peerProperties);
+        return hfClient.newPeer(peerName, peerUrl, properties);
     }
 
     /**
      * Create new eventhub using fabric.yaml. Properties for eventhub can be defined by corresponding key.
      * List of supported properties:
-     * @see HFClient#newEventHub(String, String, Properties)
      *
      * @param hfClient Hyperledger Fabric client
-     * @param key key of the eventhub in fabric.yaml
-     *
+     * @param key      key of the eventhub in fabric.yaml
      * @return the eventhub
      * @throws InvalidArgumentException throws by SDK in case of exception
+     * @see HFClient#newEventHub(String, String, Properties)
      */
     public EventHub getNewEventhub(HFClient hfClient, String key) throws InvalidArgumentException {
-        JsonNode eventhubParameters = requireNonNull(getEventhubDetails(key));
+        ConfigData.Eventhub eventhubParameters = requireNonNull(getEventhubDetails(key));
 
-        String eventhubUrl = eventhubParameters.get("url").asText();
-        String eventhubName = eventhubParameters.path("name").asText(key);
-        String eventhubPemFile = getFileName(eventhubParameters, "pemFile", "");
+        String eventhubUrl = getOrThrow(eventhubParameters.url, String.format("eventhub[%s].url", key));
+        String eventhubName = getOrDefault(eventhubParameters.name, key);
 
-        Properties eventhubProperties = jsonToProperties(eventhubParameters.get("properties"));
-        eventhubProperties.setProperty("pemFile", eventhubPemFile);
+        Properties properties = mapToProperties(eventhubParameters.properties);
+        updatePemFile(properties, eventhubParameters.pemFile);
 
-        logger.info("Creating Eventhub with props: {}", eventhubProperties);
+        logger.info("Creating Eventhub with props: {}", properties);
 
-        return hfClient.newEventHub(eventhubName, eventhubUrl, eventhubProperties);
+        return hfClient.newEventHub(eventhubName, eventhubUrl, properties);
     }
 
     public Channel generateChannel(HFClient hfClient, String channelName, User fabricUser, Orderer orderer) throws Exception {
@@ -292,44 +321,20 @@ public class FabricConfig extends YamlConfig {
     }
 
     public Channel getChannel(HFClient hfClient, String channelName, FabricConnector.Options options) throws Exception {
-        JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
-        String adminKey = channelParameters.get("admin").asText();
+        ConfigData.Channel channelParameters = requireNonNull(getChannelDetails(channelName));
+        String adminKey = getOrThrow(channelParameters.admin, String.format("channel[%s].admin", channelName));
         final User fabricUser = getAdmin(adminKey);
         return getChannel(hfClient, channelName, fabricUser, options);
     }
 
     public Channel getChannel(HFClient hfClient, String channelName, User fabricUser, FabricConnector.Options options) throws Exception {
-        JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
+        ConfigData.Channel channelParameters = requireNonNull(getChannelDetails(channelName));
         requireNonNull(fabricUser);
         hfClient.setUserContext(fabricUser);
 
-        Iterator<JsonNode> orderers = channelParameters.path("orderers").iterator();
-        if (!orderers.hasNext())
-            throw new RuntimeException("Orderers list can`t be empty");
-        List<Orderer> ordererList = new ArrayList<>();
-        while (orderers.hasNext()) {
-            String ordererKey = orderers.next().asText();
-            Orderer orderer = getNewOrderer(hfClient, ordererKey);
-            ordererList.add(orderer);
-        }
-
-        Iterator<JsonNode> peers = channelParameters.path("peers").iterator();
-        if (!peers.hasNext())
-            throw new RuntimeException("Peers list can`t be empty");
-        List<Peer> peerList = new ArrayList<>();
-        while (peers.hasNext()) {
-            String peerKey = peers.next().asText();
-            Peer peer = getNewPeer(hfClient, peerKey);
-            peerList.add(peer);
-        }
-
-        Iterator<JsonNode> eventhubs = channelParameters.path("eventhubs").iterator();
-        List<EventHub> eventhubList = new ArrayList<>();
-        while (eventhubs.hasNext()) {
-            String eventhubKey = eventhubs.next().asText();
-            EventHub eventhub = getNewEventhub(hfClient, eventhubKey);
-            eventhubList.add(eventhub);
-        }
+        final List<Orderer> ordererList = getOrdererList(hfClient, channelParameters);
+        final List<Peer> peerList = getPeerList(hfClient, channelParameters);
+        final List<EventHub> eventhubList = getEventHubList(hfClient, channelParameters);
 
         Channel channel = hfClient.newChannel(channelName);
         final EventTracker eventTracker = options != null ? options.eventTracker : null;
@@ -370,26 +375,67 @@ public class FabricConfig extends YamlConfig {
         return channel;
     }
 
-    public ChaincodeID getChaincodeID(String key) {
-        return getChaincodeID(getChaincodeDetails(key));
+    public List<EventHub> getEventHubList(HFClient hfClient, ConfigData.Channel channelParameters) throws InvalidArgumentException {
+        Set<String> eventhubs = channelParameters.eventhubs;
+        List<EventHub> eventhubList = new ArrayList<>();
+        for (String eventhubKey : eventhubs) {
+            EventHub eventhub = getNewEventhub(hfClient, eventhubKey);
+            eventhubList.add(eventhub);
+        }
+        return eventhubList;
     }
 
-    public ChaincodeID getChaincodeID(JsonNode chaincodeParameters) {
-        String chaincodeIDString = chaincodeParameters.get("id").asText();
-        String chaincodePath = chaincodeParameters.get("sourceLocation").asText();
-        String chaincodeVersion = chaincodeParameters.path("version").asText("0");
+    public List<Peer> getPeerList(HFClient hfClient, ConfigData.Channel channelParameters) throws InvalidArgumentException {
+        Set<String> peers = channelParameters.peers;
+        if (peers == null || peers.isEmpty())
+            throw new RuntimeException("Peers list can`t be empty");
+        List<Peer> peerList = new ArrayList<>();
+        for (String peerKey : peers) {
+            Peer peer = getNewPeer(hfClient, peerKey);
+            peerList.add(peer);
+        }
+        return peerList;
+    }
 
-        return ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
+    public List<Orderer> getOrdererList(HFClient hfClient, ConfigData.Channel channelParameters) throws InvalidArgumentException {
+        Set<String> orderers = channelParameters.orderers;
+        if (orderers == null || orderers.isEmpty())
+            throw new RuntimeException("Orderers list can`t be empty");
+        List<Orderer> ordererList = new ArrayList<>();
+        for (String ordererKey : orderers) {
+            Orderer orderer = getNewOrderer(hfClient, ordererKey);
+            ordererList.add(orderer);
+        }
+        return ordererList;
+    }
+
+    public ChaincodeID getChaincodeID(String chaincodeKey) throws InvalidArgumentException {
+        return getChaincodeID(chaincodeKey, getChaincodeDetails(chaincodeKey));
+    }
+
+    public ChaincodeID getChaincodeID(String chaincodeKey, ConfigData.Chaincode chaincodeParameters) throws InvalidArgumentException {
+        if (chaincodeParameters == null)
+            throw new RuntimeException(String.format("Chaincode '%s' is not specified", chaincodeKey));
+        final String prefix = String.format("chaincode[%s].", chaincodeKey);
+        final String chaincodeIDString = getOrThrow(chaincodeParameters.id, prefix + "id");
+        final String chaincodePath = getOrThrow(chaincodeParameters.sourceLocation, prefix + "sourceLocation");
+        final String chaincodeVersion = getOrDefault(chaincodeParameters.version, "0");
+
+        return ChaincodeID.newBuilder()
+                .setName(chaincodeIDString)
+                .setVersion(chaincodeVersion)
+                .setPath(chaincodePath)
+                .build();
     }
 
     public void installChaincode(HFClient hfClient, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException {
-        JsonNode chaincodeParameters = getChaincodeDetails(key);
+        ConfigData.Chaincode chaincodeParameters = getChaincodeDetails(key);
 
         // String chaincodePathPrefix = chaincodeParameters.path("sourceLocationPrefix").asText("chaincode");
-        String chaincodePathPrefix = getFileName(chaincodeParameters, "sourceLocationPrefix", "chaincode");
-        String chaincodeType = chaincodeParameters.path("type").asText("GO_LANG");
+        String chaincodePathPrefix = getFileName(chaincodeParameters.sourceLocationPrefix, "chaincode");
+        String chaincodeType = getOrDefault(chaincodeParameters.type, "GO_LANG");
 
-        ChaincodeID chaincodeID = getChaincodeID(chaincodeParameters);
+        ChaincodeID chaincodeID = getChaincodeID(key, chaincodeParameters);
         String chaincodeVersion = chaincodeID.getVersion();
 
         InstallProposalRequest installProposalRequest = hfClient.newInstallProposalRequest();
@@ -404,54 +450,49 @@ public class FabricConfig extends YamlConfig {
         checkProposalResponse("install chaincode", installProposalResponse);
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException, ChaincodeCollectionConfigurationException {
+    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ChaincodeCollectionConfigurationException {
         return instantiateChaincode(hfClient, channel, key, null, null);
     }
 
-
-    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key, JsonNode channelConfig) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException, ChaincodeCollectionConfigurationException {
-        return instantiateChaincode(hfClient, channel, key, channelConfig, null);
+    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key, JsonNode collectionPolicy) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ChaincodeCollectionConfigurationException {
+        return instantiateChaincode(hfClient, channel, key, collectionPolicy, null);
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key, JsonNode channelConfig, Collection<Peer> peers) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ChaincodeCollectionConfigurationException {
+    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key, JsonNode collectionPolicy, Collection<Peer> peers) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ChaincodeCollectionConfigurationException {
 
-        JsonNode chaincodeParameters = getChaincodeDetails(key);
+        ConfigData.Chaincode chaincodeParameters = getChaincodeDetails(key);
 
-        ChaincodeID chaincodeID = getChaincodeID(chaincodeParameters);
+        ChaincodeID chaincodeID = getChaincodeID(key, chaincodeParameters);
 
-        List<String> chaincodeInitArguments = new ArrayList<>();
-        chaincodeParameters.withArray("initArguments").forEach(element -> chaincodeInitArguments.add(element.asText()));
+        List<String> chaincodeInitArguments = getOrDefault(chaincodeParameters.initArguments, Collections.emptyList());
 
         InstantiateProposalRequest instantiateProposalRequest = hfClient.newInstantiationProposalRequest();
         instantiateProposalRequest.setProposalWaitTime(120000);
         instantiateProposalRequest.setChaincodeID(chaincodeID);
         instantiateProposalRequest.setFcn("init");
-        instantiateProposalRequest.setArgs(chaincodeInitArguments.stream().toArray(String[]::new));
+        instantiateProposalRequest.setArgs(chaincodeInitArguments.toArray(new String[0]));
         Map<String, byte[]> tm = new HashMap<>();
         tm.put("HyperLedgerFabric", "InstantiateProposalRequest:JavaSDK".getBytes(UTF_8));
         tm.put("method", "InstantiateProposalRequest".getBytes(UTF_8));
         instantiateProposalRequest.setTransientMap(tm);
 
-        String endorsementPolicy = getFileName(chaincodeParameters, "endorsementPolicy", "");
-        if (!endorsementPolicy.isEmpty()) {
+        String endorsementPolicy = getFileName(chaincodeParameters.endorsementPolicy, null);
+        if (endorsementPolicy != null && !endorsementPolicy.isEmpty()) {
             ChaincodeEndorsementPolicy chaincodeEndorsementPolicy = new ChaincodeEndorsementPolicy();
             chaincodeEndorsementPolicy.fromYamlFile(new File(endorsementPolicy));
             instantiateProposalRequest.setChaincodeEndorsementPolicy(chaincodeEndorsementPolicy);
         }
 
 
-        JsonNode collectionPolicyNode = null;
-
-        if (channelConfig != null)
-            collectionPolicyNode = channelConfig.get(COLLECTION_POLICY);
+        JsonNode collectionPolicyNode = collectionPolicy;
 
         if (collectionPolicyNode == null)
-            collectionPolicyNode = chaincodeParameters.get(COLLECTION_POLICY);
+            collectionPolicyNode = chaincodeParameters.collectionPolicy;
 
         if (collectionPolicyNode != null) {
             final ChaincodeCollectionConfiguration chaincodeCollectionConfiguration;
             if (collectionPolicyNode.isTextual() && !collectionPolicyNode.asText().isEmpty()) {
-                final String fileName = getFileName(collectionPolicyNode.asText());
+                final String fileName = getFileName(new FileReference(collectionPolicyNode.asText()));
                 final File file = new File(fileName);
 
                 if (fileName.endsWith(".yaml") || fileName.endsWith(".yml"))
@@ -481,7 +522,7 @@ public class FabricConfig extends YamlConfig {
 
         logger.info("instantiate chaincode proposal {}/{}:{}", channel.getName(), chaincodeID.getName(), chaincodeID.getVersion());
         Collection<ProposalResponse> instantiateProposalResponses;
-        if(peers != null) {
+        if (peers != null) {
             instantiateProposalResponses = channel.sendInstantiationProposal(instantiateProposalRequest, peers);
         } else {
             instantiateProposalResponses = channel.sendInstantiationProposal(instantiateProposalRequest);
@@ -492,15 +533,14 @@ public class FabricConfig extends YamlConfig {
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> upgradeChaincode(HFClient hfClient, Channel channel, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException {
-        JsonNode chaincodeParameters = getChaincodeDetails(key);
+        ConfigData.Chaincode chaincodeParameters = getChaincodeDetails(key);
 
-        List<String> chaincodeInitArguments = new ArrayList<>();
-        chaincodeParameters.withArray("initArguments").forEach(element -> chaincodeInitArguments.add(element.asText()));
+        List<String> chaincodeInitArguments = getOrDefault(chaincodeParameters.initArguments, Collections.emptyList());
 
-        String chaincodePathPrefix = getFileName(chaincodeParameters, "sourceLocationPrefix", "chaincode");
-        String chaincodeType = chaincodeParameters.path("type").asText("GO_LANG");
+        String chaincodePathPrefix = getFileName(chaincodeParameters.sourceLocationPrefix, "chaincode");
+        String chaincodeType = getOrDefault(chaincodeParameters.type, "GO_LANG");
 
-        ChaincodeID chaincodeID = getChaincodeID(chaincodeParameters);
+        ChaincodeID chaincodeID = getChaincodeID(key, chaincodeParameters);
         String chaincodeVersion = chaincodeID.getVersion();
 
         InstallProposalRequest installProposalRequest = hfClient.newInstallProposalRequest();
@@ -517,7 +557,7 @@ public class FabricConfig extends YamlConfig {
         upgradeProposalRequest.setChaincodeID(chaincodeID);
         upgradeProposalRequest.setChaincodeVersion(chaincodeVersion);
         upgradeProposalRequest.setProposalWaitTime(120000);
-        upgradeProposalRequest.setArgs(chaincodeInitArguments.stream().toArray(String[]::new));
+        upgradeProposalRequest.setArgs(chaincodeInitArguments.toArray(new String[0]));
         Map<String, byte[]> tm = new HashMap<>();
         tm.put("HyperLedgerFabric", "UpgradeProposalRequest:JavaSDK".getBytes(UTF_8));
         tm.put("method", "UpgradeProposalRequest".getBytes(UTF_8));
@@ -541,11 +581,24 @@ public class FabricConfig extends YamlConfig {
         }
     }
 
-    private static PrivateKey getPrivateKeyFromBytes(byte[] data) throws IOException {
-        final PEMParser pemParser = new PEMParser(new StringReader(new String(data)));
+    private static PrivateKey getPrivateKeyFromString(String data) throws IOException {
+        final PEMParser pemParser = new PEMParser(new StringReader(data));
         PrivateKeyInfo pemPair = (PrivateKeyInfo) pemParser.readObject();
         PrivateKey privateKey = new JcaPEMKeyConverter().getPrivateKey(pemPair);
         return privateKey;
+    }
+
+    private static PrivateKey getPrivateKeyFromBytes(byte[] data) throws IOException {
+        return getPrivateKeyFromString(new String(data));
+    }
+
+    public static Enrollment createEnrollment(PrivateKey privateKey, String pemCertificate) {
+        return new FabricUserEnrollment(privateKey, pemCertificate);
+    }
+
+    public static Enrollment createEnrollment(String pemPrivateKey, String pemCertificate) throws IOException {
+        PrivateKey privateKey = getPrivateKeyFromString(pemPrivateKey);
+        return new FabricUserEnrollment(privateKey, pemCertificate);
     }
 
     public static Enrollment createEnrollment(InputStream privateKeyFile, InputStream certFile) throws IOException {
@@ -554,26 +607,18 @@ public class FabricConfig extends YamlConfig {
         return new FabricUserEnrollment(privateKey, IOUtils.toString(certFile));
     }
 
-    public HFCAClient createHFCAClient(String caKey) throws MalformedURLException {
-        JsonNode caParameters = getCADetails(caKey);
-        Properties properties = null;
+    public HFCAClient createHFCAClient(String caKey) throws MalformedURLException, InvalidArgumentException {
+        ConfigData.CA caParameters = getCADetails(caKey);
+        String caUrl = getOrThrow(caParameters.url, String.format("cs[%s].url", caKey));
 
-        String caUrl = caParameters.get("url").asText();
+        final Properties properties = mapToProperties(caParameters.properties);
+        updatePemFile(properties, caParameters.pemFile);
 
-        String caCertPem = getFileName(caParameters, "pemFile", "");
-        String caAllowAllHostNames = caParameters.path("allowAllHostNames").asText("");
-
-        if (!caCertPem.isEmpty()) {
-            properties = new Properties();
-            properties.setProperty("pemFile", caCertPem);
-            if (!caAllowAllHostNames.isEmpty())
-                properties.setProperty("allowAllHostNames", caAllowAllHostNames);
-        }
         HFCAClient hfcaClient = HFCAClient.createNewInstance(caUrl, properties);
         return hfcaClient;
     }
 
-    public HFCAClient createHFCAClient(String caKey, CryptoSuite cryptoSuite) throws MalformedURLException {
+    public HFCAClient createHFCAClient(String caKey, CryptoSuite cryptoSuite) throws MalformedURLException, InvalidArgumentException {
         if (cryptoSuite == null)
             cryptoSuite = getCryptoSuite();
         HFCAClient hfcaClient = createHFCAClient(caKey);
@@ -586,10 +631,10 @@ public class FabricConfig extends YamlConfig {
     }
 
     public User enrollAdmin(HFCAClient hfcaClient, String caKey) throws Exception {
-        JsonNode caParameters = getCADetails(caKey);
-        String caAdminLogin = caParameters.get("adminLogin").asText();
-        String caAdminSecret = caParameters.get("adminSecret").asText();
-        String caMspID = caParameters.get("mspID").asText();
+        ConfigData.CA caParameters = getCADetails(caKey);
+        String caAdminLogin = getOrThrow(caParameters.adminLogin, String.format("ca[%s].adminLogin", caKey));
+        String caAdminSecret = getOrThrow(caParameters.adminSecret, String.format("ca[%s].adminSecret", caKey));
+        String caMspID = getOrThrow(caParameters.mspID, String.format("ca[%s].mspID", caKey));
         Enrollment adminEnrollment = hfcaClient.enroll(caAdminLogin, caAdminSecret);
         User adminUser = new FabricUser(caAdminLogin, null, null, adminEnrollment, caMspID);
         return adminUser;
@@ -607,16 +652,15 @@ public class FabricConfig extends YamlConfig {
     }
 
     public User enrollUser(String caKey, String userName, String userSecret) throws Exception {
-        JsonNode caParameters = getCADetails(caKey);
-        String caMspID = caParameters.get("mspID").asText();
+        ConfigData.CA caParameters = getCADetails(caKey);
+        String caMspID = getOrThrow(caParameters.mspID, String.format("ca[%s].mspID", caKey));
         HFCAClient hfcaClient = createHFCAClient(caKey, null);
         return enrollUser(hfcaClient, userName, userSecret, caMspID);
     }
 
     public static User enrollUser(HFCAClient hfcaClient, String userName, String userSecret, String mspID) throws Exception {
         Enrollment adminEnrollment = hfcaClient.enroll(userName, userSecret);
-        User user = new FabricUser(userName, null, null, adminEnrollment, mspID);
-        return user;
+        return new FabricUser(userName, null, null, adminEnrollment, mspID);
     }
 
     public static FabricConfig getConfigFromFile(String configFile) {
@@ -713,5 +757,44 @@ public class FabricConfig extends YamlConfig {
             }
         }
         return peerProperties;
+    }
+
+    /**
+     * Convert Map<String,String> object to Java properties.
+     * @param stringMap node with properties
+     * @return properties with keys and values from stringMap
+     */
+    private static Properties mapToProperties(Map<String, String> stringMap) {
+        Properties properties = new Properties();
+
+        if (stringMap != null) {
+            Set<Map.Entry<String, String>> fields = stringMap.entrySet();
+            for (Map.Entry<String, String> field : fields) {
+                final String fieldName = field.getKey();
+                final String fieldValue = field.getValue();
+
+                switch (fieldName) {
+                    case "idleTimeout":
+                        /** @see Endpoint#addNettyBuilderProps for more info */
+                        final TimePair idleTimeout = parseInterval(fieldValue);
+                        properties.put("grpc.NettyChannelBuilderOption.idleTimeout", new Object[]{Long.valueOf(idleTimeout.value), idleTimeout.timeUnit});
+                        break;
+                    default:
+                        properties.setProperty(fieldName, fieldValue);
+                        break;
+                }
+            }
+        }
+        return properties;
+    }
+
+    public static <T extends X, X> X getOrDefault(T value, X defValue) {
+        return value == null ? defValue : value;
+    }
+
+    public static <T> T getOrThrow(T value, String propName) throws InvalidArgumentException {
+        if (value == null)
+            throw new InvalidArgumentException("property [" + propName + "] should be set");
+        return value;
     }
 }
