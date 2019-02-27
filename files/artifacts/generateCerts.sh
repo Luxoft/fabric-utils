@@ -30,7 +30,7 @@ function generateCerts (){
 #  echo "##### Generate certificates using cryptogen tool #########"
 #  echo "##########################################################"
 
-  cryptogen generate --config=./crypto-config.yaml
+  cryptogen generate --config=./channel/cryptogen.yaml
   if [ "$?" -ne 0 ]; then
     echo "Failed to generate certificates..."
     exit 1
@@ -38,21 +38,6 @@ function generateCerts (){
   echo
 }
 
-
 CLI_TIMEOUT=10000
-CHANNEL_NAME="demo-channel"
-
-# Parse commandline args
-while getopts "m:c:" opt; do
-  case "$opt" in
-    c)  CHANNEL_NAME=$OPTARG
-    ;;
-  esac
-done
-
-
-echo "Generating artifacts for channel '${CHANNEL_NAME}'"
-#askProceed
 
 generateCerts
-

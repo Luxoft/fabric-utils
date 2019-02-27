@@ -18,7 +18,7 @@ To work with already configured channel you will need to provide following data
         - cert – path to user certificate pem file
         - privateKey – path to user private key pem file
         - mspID – id of organization(predefined in fabric network) that user belongs to
-- eventhubs – list of event hubs
+- eventhubs – list of event hubs (deprecated, use peer event service)
     - key-name – key value that can be used for referring eventhubs in this config file
         - url – url for access
         - pemFile – file location for x509 pem certificate for SSL
@@ -38,7 +38,8 @@ To work with already configured channel you will need to provide following data
         - admin – user that will be used for working with this channel
         - orderers – list of orderer key-names that serve this channel
         - peers – list of peer key-names that serve this channel
-        - eventhubs – list of eventhub key-names that serve this channel
+        - eventhubs (deprecated) – list of eventhub key-names that serve this channel
+
 - cas – list of CAs
     - key-name – key value that can be used for referring CA in application
         - url – url for access
@@ -59,10 +60,25 @@ These fields are used to configure and update network config via fabric-configur
         - version – version number for this chaincode, should consist of v{number}
         - type – chaincode`s format\language
         - initArguments – list  of arguments to for initialization function as JSON strings
+        - collectionPolicy – object to describe collection policy (as specified
+         in fabric-1.3 SDK)
+
 - channels – list of channels
     - key-name – key value that can be used for referring channel in application
         - txFile – transaction file used for channel creation
         - chaincodes – list of chaincode key-names that should be deployed to this channel
+            Might be in form of
+            1) key [String]: reference to the chaincodes section
+            2) object, which describes how to deploy this chaincode into that channel
+               There are two keys currently recognized:
+               - name: <string> reference to the chaincodes section
+               - collectionPolicy: object to describe collection policy (as specified
+                in fabric-1.3 SDK)
+          when `collectionPolicy` specified both in `channels` and in `chaincodes`
+          sections, `channels` section takes precedence.
+          collectionPolicy itself can be a string, referring to the yaml of json file,
+          or an object to describe policy inline.
+
 - users – list of users to enroll
     - key-name – key value that can be used for referring CA in which enroll users
         - userAffiliation – affiliation for users

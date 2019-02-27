@@ -20,6 +20,8 @@
 package com.luxoft.fabric;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.luxoft.fabric.utils.ConfigGenerator;
 import com.luxoft.fabric.utils.MiscUtils;
 import org.apache.commons.io.IOUtils;
@@ -27,39 +29,46 @@ import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
 import org.bouncycastle.openssl.PEMParser;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.hyperledger.fabric.sdk.*;
-import org.hyperledger.fabric.sdk.exception.ChaincodeEndorsementPolicyParseException;
-import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
-import org.hyperledger.fabric.sdk.exception.ProposalException;
+import org.hyperledger.fabric.sdk.exception.*;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.hyperledger.fabric_ca.sdk.HFCAClient;
 import org.hyperledger.fabric_ca.sdk.RegistrationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.json.Json;
 import java.io.*;
 import java.net.MalformedURLException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
-import java.security.spec.InvalidKeySpecException;
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
 public class FabricConfig extends YamlConfig {
 
+    public static final String COLLECTION_POLICY = "collectionPolicy";
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
     private final ConfigGenerator configGenerator = new ConfigGenerator();
     private final String confDir;
 
     static {
         //loading Fabric security provider to the system
-        CryptoSuite.Factory.getCryptoSuite();
+        getCryptoSuite();
+    }
+
+    public static CryptoSuite getCryptoSuite() {
+        try {
+            return CryptoSuite.Factory.getCryptoSuite();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     public FabricConfig(Reader configReader) throws IOException {
@@ -77,6 +86,13 @@ public class FabricConfig extends YamlConfig {
             return channels.elements();
         else
             return Collections.emptyIterator();
+    }
+
+    public static HFClient createHFClient() throws CryptoException, InvalidArgumentException {
+        CryptoSuite cryptoSuite = getCryptoSuite();
+        HFClient hfClient = HFClient.createNewInstance();
+        hfClient.setCryptoSuite(cryptoSuite);
+        return hfClient;
     }
 
     public JsonNode getChannelDetails(String key) {
@@ -163,6 +179,13 @@ public class FabricConfig extends YamlConfig {
     public String getFileName(JsonNode jsonNode, String name)
     {
         return getFileName(jsonNode, name, null);
+    }
+
+    public String getFileName(String fileName)
+    {
+        if (fileName == null || fileName.isEmpty())
+            return fileName;
+        return MiscUtils.resolveFile(fileName, confDir);
     }
 
     public User getAdmin(String key) throws Exception {
@@ -260,30 +283,37 @@ public class FabricConfig extends YamlConfig {
         return hfClient.newChannel(channelName, orderer, channelConfiguration, channelConfigurationSignature);
     }
 
-    public void initChannel(HFClient hfClient, String channelName) throws Exception {
-        getChannel(hfClient, channelName);
+    public void initChannel(HFClient hfClient, String channelName, FabricConnector.Options options) throws Exception {
+        getChannel(hfClient, channelName, options);
     }
 
-    public void initChannel(HFClient hfClient, String channelName, User fabricUser) throws Exception {
-        getChannel(hfClient, channelName, fabricUser);
+    public void initChannel(HFClient hfClient, String channelName, User fabricUser, FabricConnector.Options options) throws Exception {
+        getChannel(hfClient, channelName, fabricUser, options);
     }
 
-    public Channel getChannel(HFClient hfClient, String channelName) throws Exception {
+    public Channel getChannel(HFClient hfClient, String channelName, FabricConnector.Options options) throws Exception {
         JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
         String adminKey = channelParameters.get("admin").asText();
         final User fabricUser = getAdmin(adminKey);
-        return getChannel(hfClient, channelName, fabricUser);
+        return getChannel(hfClient, channelName, fabricUser, options);
     }
 
-    public Channel getChannel(HFClient hfClient, String channelName, User fabricUser) throws Exception {
+    public Channel getChannel(HFClient hfClient, String channelName, User fabricUser, FabricConnector.Options options) throws Exception {
         JsonNode channelParameters = requireNonNull(getChannelDetails(channelName));
         requireNonNull(fabricUser);
         hfClient.setUserContext(fabricUser);
 
-        String ordererName = channelParameters.get("orderers").get(0).asText();
-        Orderer orderer = getNewOrderer(hfClient, ordererName);
+        Iterator<JsonNode> orderers = channelParameters.path("orderers").iterator();
+        if (!orderers.hasNext())
+            throw new RuntimeException("Orderers list can`t be empty");
+        List<Orderer> ordererList = new ArrayList<>();
+        while (orderers.hasNext()) {
+            String ordererKey = orderers.next().asText();
+            Orderer orderer = getNewOrderer(hfClient, ordererKey);
+            ordererList.add(orderer);
+        }
 
-        Iterator<JsonNode> peers = channelParameters.get("peers").iterator();
+        Iterator<JsonNode> peers = channelParameters.path("peers").iterator();
         if (!peers.hasNext())
             throw new RuntimeException("Peers list can`t be empty");
         List<Peer> peerList = new ArrayList<>();
@@ -293,7 +323,7 @@ public class FabricConfig extends YamlConfig {
             peerList.add(peer);
         }
 
-        Iterator<JsonNode> eventhubs = channelParameters.get("eventhubs").iterator();
+        Iterator<JsonNode> eventhubs = channelParameters.path("eventhubs").iterator();
         List<EventHub> eventhubList = new ArrayList<>();
         while (eventhubs.hasNext()) {
             String eventhubKey = eventhubs.next().asText();
@@ -302,60 +332,98 @@ public class FabricConfig extends YamlConfig {
         }
 
         Channel channel = hfClient.newChannel(channelName);
-        channel.addOrderer(orderer);
-        for (Peer peer : peerList) {
-            channel.addPeer(peer);
+        final EventTracker eventTracker = options != null ? options.eventTracker : null;
+        final Channel.PeerOptions peerOptions = Channel.PeerOptions.createPeerOptions();
+
+        if (eventTracker != null) {
+            eventTracker.configureChannel(channel);
+            final long startBlock = eventTracker.getStartBlock(channel);
+
+            if (startBlock > 0 && startBlock < Long.MAX_VALUE)
+                peerOptions.startEvents(startBlock);
+            else
+                peerOptions.startEventsNewest();
+
+            if (eventTracker.useFilteredBlocks(channel))
+                peerOptions.registerEventsForFilteredBlocks();
+            else
+                peerOptions.registerEventsForBlocks();
         }
+
+        for (Orderer orderer : ordererList) {
+            channel.addOrderer(orderer);
+        }
+
+        for (Peer peer : peerList) {
+            channel.addPeer(peer, peerOptions);
+        }
+
         for (EventHub eventhub : eventhubList) {
             channel.addEventHub(eventhub);
         }
+
         channel.initialize();
+
+        if (eventTracker != null)
+            eventTracker.connectChannel(channel);
+
         return channel;
     }
 
+    public ChaincodeID getChaincodeID(String key) {
+        return getChaincodeID(getChaincodeDetails(key));
+    }
+
+    public ChaincodeID getChaincodeID(JsonNode chaincodeParameters) {
+        String chaincodeIDString = chaincodeParameters.get("id").asText();
+        String chaincodePath = chaincodeParameters.get("sourceLocation").asText();
+        String chaincodeVersion = chaincodeParameters.path("version").asText("0");
+
+        return ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
+    }
 
     public void installChaincode(HFClient hfClient, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException {
         JsonNode chaincodeParameters = getChaincodeDetails(key);
 
-        String chaincodeIDString = chaincodeParameters.get("id").asText();
-        String chaincodePath = chaincodeParameters.get("sourceLocation").asText();
-
         // String chaincodePathPrefix = chaincodeParameters.path("sourceLocationPrefix").asText("chaincode");
         String chaincodePathPrefix = getFileName(chaincodeParameters, "sourceLocationPrefix", "chaincode");
-        String chaincodeVersion = chaincodeParameters.path("version").asText("0");
         String chaincodeType = chaincodeParameters.path("type").asText("GO_LANG");
 
-        ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
+        ChaincodeID chaincodeID = getChaincodeID(chaincodeParameters);
+        String chaincodeVersion = chaincodeID.getVersion();
 
         InstallProposalRequest installProposalRequest = hfClient.newInstallProposalRequest();
         installProposalRequest.setChaincodeID(chaincodeID);
         installProposalRequest.setChaincodeSourceLocation(new File(chaincodePathPrefix));
         installProposalRequest.setChaincodeVersion(chaincodeVersion);
         installProposalRequest.setChaincodeLanguage(TransactionRequest.Type.valueOf(chaincodeType));
+
+        logger.info("install chaincode proposal {}:{}", chaincodeID.getName(), chaincodeID.getVersion());
         Collection<ProposalResponse> installProposalResponse = hfClient.sendInstallProposal(installProposalRequest, peerList);
 
         checkProposalResponse("install chaincode", installProposalResponse);
     }
 
-
-    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException {
-        return instantiateChaincode(hfClient, channel, key, null);
+    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException, ChaincodeCollectionConfigurationException {
+        return instantiateChaincode(hfClient, channel, key, null, null);
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key, Collection<Peer> peers) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException {
+
+    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key, JsonNode channelConfig) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException, ChaincodeCollectionConfigurationException {
+        return instantiateChaincode(hfClient, channel, key, channelConfig, null);
+    }
+
+    public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key, JsonNode channelConfig, Collection<Peer> peers) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ChaincodeCollectionConfigurationException {
 
         JsonNode chaincodeParameters = getChaincodeDetails(key);
 
-        String chaincodeIDString = chaincodeParameters.get("id").asText();
-        String chaincodePath = chaincodeParameters.get("sourceLocation").asText();
-        String chaincodeVersion = chaincodeParameters.path("version").asText("0");
-        ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
+        ChaincodeID chaincodeID = getChaincodeID(chaincodeParameters);
 
         List<String> chaincodeInitArguments = new ArrayList<>();
         chaincodeParameters.withArray("initArguments").forEach(element -> chaincodeInitArguments.add(element.asText()));
 
         InstantiateProposalRequest instantiateProposalRequest = hfClient.newInstantiationProposalRequest();
-        instantiateProposalRequest.setProposalWaitTime(60000);
+        instantiateProposalRequest.setProposalWaitTime(120000);
         instantiateProposalRequest.setChaincodeID(chaincodeID);
         instantiateProposalRequest.setFcn("init");
         instantiateProposalRequest.setArgs(chaincodeInitArguments.stream().toArray(String[]::new));
@@ -370,6 +438,48 @@ public class FabricConfig extends YamlConfig {
             chaincodeEndorsementPolicy.fromYamlFile(new File(endorsementPolicy));
             instantiateProposalRequest.setChaincodeEndorsementPolicy(chaincodeEndorsementPolicy);
         }
+
+
+        JsonNode collectionPolicyNode = null;
+
+        if (channelConfig != null)
+            collectionPolicyNode = channelConfig.get(COLLECTION_POLICY);
+
+        if (collectionPolicyNode == null)
+            collectionPolicyNode = chaincodeParameters.get(COLLECTION_POLICY);
+
+        if (collectionPolicyNode != null) {
+            final ChaincodeCollectionConfiguration chaincodeCollectionConfiguration;
+            if (collectionPolicyNode.isTextual() && !collectionPolicyNode.asText().isEmpty()) {
+                final String fileName = getFileName(collectionPolicyNode.asText());
+                final File file = new File(fileName);
+
+                if (fileName.endsWith(".yaml") || fileName.endsWith(".yml"))
+                    chaincodeCollectionConfiguration = ChaincodeCollectionConfiguration.fromYamlFile(file);
+                else if (fileName.endsWith(".json"))
+                    chaincodeCollectionConfiguration = ChaincodeCollectionConfiguration.fromJsonFile(file);
+                else
+                    chaincodeCollectionConfiguration = null;
+            } else if (collectionPolicyNode.isArray()) {
+
+                ObjectMapper mapper = new ObjectMapper();
+
+                // FIXME: this is not efficient, needs to find/implement better solution
+                final String s = mapper.writeValueAsString(collectionPolicyNode);
+                final javax.json.JsonArray jsonValues = Json.createReader(new StringReader(s)).readArray();
+
+                chaincodeCollectionConfiguration = ChaincodeCollectionConfiguration.fromJsonObject(jsonValues);
+            } else
+                chaincodeCollectionConfiguration = null;
+
+            if (chaincodeCollectionConfiguration == null)
+                throw new InvalidArgumentException("collectionPolicy is not if valid type");
+
+            instantiateProposalRequest.setChaincodeCollectionConfiguration(chaincodeCollectionConfiguration);
+        }
+
+
+        logger.info("instantiate chaincode proposal {}/{}:{}", channel.getName(), chaincodeID.getName(), chaincodeID.getVersion());
         Collection<ProposalResponse> instantiateProposalResponses;
         if(peers != null) {
             instantiateProposalResponses = channel.sendInstantiationProposal(instantiateProposalRequest, peers);
@@ -381,25 +491,24 @@ public class FabricConfig extends YamlConfig {
         return channel.sendTransaction(instantiateProposalResponses);
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> upgradeChaincode(HFClient hfClient, Channel channel, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ExecutionException, InterruptedException {
+    public CompletableFuture<BlockEvent.TransactionEvent> upgradeChaincode(HFClient hfClient, Channel channel, List<Peer> peerList, String key) throws InvalidArgumentException, ProposalException {
         JsonNode chaincodeParameters = getChaincodeDetails(key);
 
         List<String> chaincodeInitArguments = new ArrayList<>();
         chaincodeParameters.withArray("initArguments").forEach(element -> chaincodeInitArguments.add(element.asText()));
 
         String chaincodePathPrefix = getFileName(chaincodeParameters, "sourceLocationPrefix", "chaincode");
-        String chaincodeIDString = chaincodeParameters.get("id").asText();
-        String chaincodePath = chaincodeParameters.get("sourceLocation").asText();
-        String chaincodeVersion = chaincodeParameters.path("version").asText("0");
         String chaincodeType = chaincodeParameters.path("type").asText("GO_LANG");
 
-        ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(chaincodeIDString).setVersion(chaincodeVersion).setPath(chaincodePath).build();
+        ChaincodeID chaincodeID = getChaincodeID(chaincodeParameters);
+        String chaincodeVersion = chaincodeID.getVersion();
 
         InstallProposalRequest installProposalRequest = hfClient.newInstallProposalRequest();
         installProposalRequest.setChaincodeID(chaincodeID);
         installProposalRequest.setChaincodeSourceLocation(new File(chaincodePathPrefix));
         installProposalRequest.setChaincodeVersion(chaincodeVersion);
         installProposalRequest.setChaincodeLanguage(TransactionRequest.Type.valueOf(chaincodeType));
+        logger.info("install chaincode proposal {}:{}", chaincodeID.getName(), chaincodeID.getVersion());
         Collection<ProposalResponse> installProposalResponse = hfClient.sendInstallProposal(installProposalRequest, peerList);
 
         checkProposalResponse("install chaincode", installProposalResponse);
@@ -407,13 +516,14 @@ public class FabricConfig extends YamlConfig {
         UpgradeProposalRequest upgradeProposalRequest = hfClient.newUpgradeProposalRequest();
         upgradeProposalRequest.setChaincodeID(chaincodeID);
         upgradeProposalRequest.setChaincodeVersion(chaincodeVersion);
-        upgradeProposalRequest.setProposalWaitTime(60000);
+        upgradeProposalRequest.setProposalWaitTime(120000);
         upgradeProposalRequest.setArgs(chaincodeInitArguments.stream().toArray(String[]::new));
         Map<String, byte[]> tm = new HashMap<>();
         tm.put("HyperLedgerFabric", "UpgradeProposalRequest:JavaSDK".getBytes(UTF_8));
         tm.put("method", "UpgradeProposalRequest".getBytes(UTF_8));
         upgradeProposalRequest.setTransientMap(tm);
 
+        logger.info("upgrade chaincode proposal {}/{}:{}", channel.getName(), chaincodeID.getName(), chaincodeID.getVersion());
         Collection<ProposalResponse> upgradeProposalResponses = channel.sendUpgradeProposal(upgradeProposalRequest, peerList);
 
         checkProposalResponse("upgrade chaincode", upgradeProposalResponses);
@@ -431,14 +541,14 @@ public class FabricConfig extends YamlConfig {
         }
     }
 
-    private static PrivateKey getPrivateKeyFromBytes(byte[] data) throws IOException, NoSuchProviderException, NoSuchAlgorithmException, InvalidKeySpecException {
+    private static PrivateKey getPrivateKeyFromBytes(byte[] data) throws IOException {
         final PEMParser pemParser = new PEMParser(new StringReader(new String(data)));
         PrivateKeyInfo pemPair = (PrivateKeyInfo) pemParser.readObject();
         PrivateKey privateKey = new JcaPEMKeyConverter().getPrivateKey(pemPair);
         return privateKey;
     }
 
-    public static Enrollment createEnrollment(InputStream privateKeyFile, InputStream certFile) throws IOException, NoSuchAlgorithmException, NoSuchProviderException, InvalidKeySpecException {
+    public static Enrollment createEnrollment(InputStream privateKeyFile, InputStream certFile) throws IOException {
         PrivateKey privateKey = getPrivateKeyFromBytes(IOUtils.toByteArray(privateKeyFile));
 
         return new FabricUserEnrollment(privateKey, IOUtils.toString(certFile));
@@ -465,7 +575,7 @@ public class FabricConfig extends YamlConfig {
 
     public HFCAClient createHFCAClient(String caKey, CryptoSuite cryptoSuite) throws MalformedURLException {
         if (cryptoSuite == null)
-            cryptoSuite = CryptoSuite.Factory.getCryptoSuite();
+            cryptoSuite = getCryptoSuite();
         HFCAClient hfcaClient = createHFCAClient(caKey);
         hfcaClient.setCryptoSuite(cryptoSuite);
         return hfcaClient;
@@ -520,6 +630,60 @@ public class FabricConfig extends YamlConfig {
         }
     }
 
+    private static class TimePair {
+        final TimeUnit timeUnit;
+        final long value;
+
+        TimePair(long value, TimeUnit timeUnit) {
+            this.value = value;
+            this.timeUnit = timeUnit;
+        }
+    }
+
+    private static TimePair parseInterval(String s) {
+        final TimePair[] nsUnits = {
+                new TimePair(1000, TimeUnit.NANOSECONDS),
+                new TimePair(1000, TimeUnit.MICROSECONDS),
+                new TimePair(Long.MAX_VALUE, TimeUnit.MILLISECONDS),
+        };
+
+        final TimePair[] sUnits = {
+                new TimePair(60, TimeUnit.SECONDS),
+                new TimePair(60, TimeUnit.MINUTES),
+                new TimePair(24, TimeUnit.HOURS),
+                new TimePair(Long.MAX_VALUE, TimeUnit.DAYS),
+        };
+
+        final Duration duration = Duration.parse(s);
+        long value;
+        TimeUnit timeUnit = null;
+
+        if (duration.isNegative() || duration.isZero())
+            return null;
+
+        if ((value = duration.getNano()) != 0) {
+            for (TimePair unit : nsUnits) {
+                if (value % unit.value != 0) {
+                    timeUnit = unit.timeUnit;
+                    break;
+                }
+                value /= unit.value;
+            }
+        } else {
+            value = duration.getSeconds();
+
+            for (TimePair unit : sUnits) {
+                if (value % unit.value != 0) {
+                    timeUnit = unit.timeUnit;
+                    break;
+                }
+                value /= unit.value;
+            }
+        }
+
+        return new TimePair(value, timeUnit);
+    }
+
     /**
      * Convert JSON node to Java properties.
      * @param propertiesNode node with properties
@@ -529,10 +693,23 @@ public class FabricConfig extends YamlConfig {
         Properties peerProperties = new Properties();
 
         if (propertiesNode != null) {
-            Iterator<String> fieldNames = propertiesNode.fieldNames();
-            while (fieldNames.hasNext()) {
-                String field = fieldNames.next();
-                peerProperties.setProperty(field, propertiesNode.get(field).asText());
+            Iterator<Map.Entry<String, JsonNode>> fields = propertiesNode.fields();
+            while (fields.hasNext()) {
+                final Map.Entry<String, JsonNode> e = fields.next();
+                final String fieldName = e.getKey();
+                final JsonNode fieldValue = e.getValue();
+                String value = fieldValue.asText();
+
+                switch (fieldName) {
+                    case "idleTimeout":
+                        /** @see Endpoint#addNettyBuilderProps for more info */
+                        final TimePair idleTimeout = parseInterval(value);
+                        peerProperties.put("grpc.NettyChannelBuilderOption.idleTimeout", new Object[]{Long.valueOf(idleTimeout.value), idleTimeout.timeUnit});
+                        break;
+                    default:
+                        peerProperties.setProperty(fieldName, fieldValue.asText());
+                        break;
+                }
             }
         }
         return peerProperties;

@@ -2,17 +2,8 @@ admins:
     - admin:
         name: admin
         cert: artifacts/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/signcerts/Admin@org1.example.com-cert.pem
-        privateKey: artifacts/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/keystore/5890f0061619c06fb29dea8cb304edecc020fe63f41a6db109f1e227cc1cb2a8_sk
+        privateKey: artifacts/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/keystore/*_sk
         mspID: Org1MSP
-
-eventhubs:
-    - eventhub:
-        url: grpcs://localhost:7053
-        pemFile: artifacts/crypto-config/peerOrganizations/org1.example.com/tlsca/tlsca.org1.example.com-cert.pem
-        properties:
-            sslProvider: openSSL
-            negotiationType: TLS
-            hostnameOverride: peer0.org1.example.com
 
 peers:
     - peer:
@@ -52,8 +43,6 @@ channels:
             - orderer
         peers:
             - peer
-        eventhubs:
-            - eventhub
         txFile: artifacts/channel/mychannel.tx
         chaincodes:
             - superchaincode
