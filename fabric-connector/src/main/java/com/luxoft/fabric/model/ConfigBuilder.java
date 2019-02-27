@@ -8,6 +8,61 @@ import java.util.Map;
 
 public class ConfigBuilder {
 
+    public static class Root {
+        private Map<String, ConfigData.Admin> admins;
+        private Map<String, ConfigData.Peer> peers;
+        private Map<String, ConfigData.Orderer> orderers;
+        private Map<String, ConfigData.Channel> channels;
+        private Map<String, ConfigData.CA> cas;
+        private Map<String, ConfigData.Eventhub> eventhubs;
+        private Map<String, ConfigData.Chaincode> chaincodes;
+        private ConfigData.Users users;
+
+        public Root withAdmins(Map<String, ConfigData.Admin> admins) {
+            this.admins = admins;
+            return this;
+        }
+
+        public Root withPeers(Map<String, ConfigData.Peer> peers) {
+            this.peers = peers;
+            return this;
+        }
+
+        public Root withOrderers(Map<String, ConfigData.Orderer> orderers) {
+            this.orderers = orderers;
+            return this;
+        }
+
+        public Root withChannels(Map<String, ConfigData.Channel> channels) {
+            this.channels = channels;
+            return this;
+        }
+
+        public Root withCas(Map<String, ConfigData.CA> cas) {
+            this.cas = cas;
+            return this;
+        }
+
+        public Root withEventhubs(Map<String, ConfigData.Eventhub> eventhubs) {
+            this.eventhubs = eventhubs;
+            return this;
+        }
+
+        public Root withChaincodes(Map<String, ConfigData.Chaincode> chaincodes) {
+            this.chaincodes = chaincodes;
+            return this;
+        }
+
+        public Root withUsers(ConfigData.Users users) {
+            this.users = users;
+            return this;
+        }
+
+        public ConfigData.Root build() {
+            return new ConfigData.Root(admins, peers, orderers, channels, cas, eventhubs, chaincodes, users);
+        }
+    }
+
     public static class Admin {
         private String name;
         private FileReference cert;
@@ -111,46 +166,133 @@ public class ConfigBuilder {
         }
     }
 
-    public static class Users {
-        private String userAffiliation;
-        private Collection<String> list;
-        private String caKey;
-        private String destFilesPath;
-        private String privateKeyFileName;
-        private String certFileName;
+    public static class Channel {
+        private String admin;
+        private Collection<String> orderers;
+        private Collection<String> peers;
+        private Collection<String> eventhubs;
+        private FileReference txFile;
+        private Collection<ConfigData.ChannelChaincode> chaincodes;
 
-        public Users withUserAffiliation(String userAffiliation) {
-            this.userAffiliation = userAffiliation;
+        public Channel withAdmin(String admin) {
+            this.admin = admin;
             return this;
         }
 
-        public Users withList(Collection<String> list) {
-            this.list = list;
+        public Channel withOrderers(Collection<String> orderers) {
+            this.orderers = orderers;
             return this;
         }
 
-        public Users withCaKey(String caKey) {
-            this.caKey = caKey;
+        public Channel withPeers(Collection<String> peers) {
+            this.peers = peers;
             return this;
         }
 
-        public Users withDestFilesPath(String destFilesPath) {
-            this.destFilesPath = destFilesPath;
+        public Channel withEventhubs(Collection<String> eventhubs) {
+            this.eventhubs = eventhubs;
             return this;
         }
 
-        public Users withPrivateKeyFileName(String privateKeyFileName) {
-            this.privateKeyFileName = privateKeyFileName;
+        public Channel withTxFile(FileReference txFile) {
+            this.txFile = txFile;
             return this;
         }
 
-        public Users withCertFileName(String certFileName) {
-            this.certFileName = certFileName;
+        public Channel withChaincodes(Collection<ConfigData.ChannelChaincode> chaincodes) {
+            this.chaincodes = chaincodes;
             return this;
         }
 
-        public ConfigData.Users build() {
-            return new ConfigData.Users(userAffiliation, list, caKey, destFilesPath, privateKeyFileName, certFileName);
+        public ConfigData.Channel build() {
+            return new ConfigData.Channel(admin, orderers, peers, eventhubs, txFile, chaincodes);
+        }
+    }
+
+    public static class Eventhub {
+        private String url;
+        private String name;
+        private FileReference pemFile;
+        private Map<String, String> properties;
+
+        public Eventhub withUrl(String url) {
+            this.url = url;
+            return this;
+        }
+
+        public Eventhub withName(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public Eventhub withPemFile(FileReference pemFile) {
+            this.pemFile = pemFile;
+            return this;
+        }
+
+        public Eventhub withProperties(Map<String, String> properties) {
+            this.properties = properties;
+            return this;
+        }
+
+        public ConfigData.Eventhub build() {
+            return new ConfigData.Eventhub(url, name, pemFile, properties);
+        }
+    }
+
+    public static class Orderer {
+        private String url;
+        private FileReference pemFile;
+        private Map<String, String> properties;
+
+        public Orderer withUrl(String url) {
+            this.url = url;
+            return this;
+        }
+
+        public Orderer withPemFile(FileReference pemFile) {
+            this.pemFile = pemFile;
+            return this;
+        }
+
+        public Orderer withProperties(Map<String, String> properties) {
+            this.properties = properties;
+            return this;
+        }
+
+        public ConfigData.Orderer build() {
+            return new ConfigData.Orderer(url, pemFile, properties);
+        }
+    }
+
+    public static class Peer {
+        private String url;
+        private String name;
+        private FileReference pemFile;
+        private Map<String, String> properties;
+
+        public Peer withUrl(String url) {
+            this.url = url;
+            return this;
+        }
+
+        public Peer withName(String name) {
+            this.name = name;
+            return this;
+        }
+
+        public Peer withPemFile(FileReference pemFile) {
+            this.pemFile = pemFile;
+            return this;
+        }
+
+        public Peer withProperties(Map<String, String> properties) {
+            this.properties = properties;
+            return this;
+        }
+
+        public ConfigData.Peer build() {
+            return new ConfigData.Peer(url, name, pemFile, properties);
         }
     }
 
@@ -209,188 +351,47 @@ public class ConfigBuilder {
         }
     }
 
-    public static class Channel {
-        private String admin;
-        private Collection<String> orderers;
-        private Collection<String> peers;
-        private Collection<String> eventhubs;
-        private FileReference txFile;
-        private Collection<ConfigData.ChannelChaincode> chaincodes;
+    public static class Users {
+        private String userAffiliation;
+        private Collection<String> list;
+        private String caKey;
+        private String destFilesPath;
+        private String privateKeyFileName;
+        private String certFileName;
 
-        public Channel withAdmin(String admin) {
-            this.admin = admin;
+        public Users withUserAffiliation(String userAffiliation) {
+            this.userAffiliation = userAffiliation;
             return this;
         }
 
-        public Channel withOrderers(Collection<String> orderers) {
-            this.orderers = orderers;
+        public Users withList(Collection<String> list) {
+            this.list = list;
             return this;
         }
 
-        public Channel withPeers(Collection<String> peers) {
-            this.peers = peers;
+        public Users withCaKey(String caKey) {
+            this.caKey = caKey;
             return this;
         }
 
-        public Channel withEventhubs(Collection<String> eventhubs) {
-            this.eventhubs = eventhubs;
+        public Users withDestFilesPath(String destFilesPath) {
+            this.destFilesPath = destFilesPath;
             return this;
         }
 
-        public Channel withTxFile(FileReference txFile) {
-            this.txFile = txFile;
+        public Users withPrivateKeyFileName(String privateKeyFileName) {
+            this.privateKeyFileName = privateKeyFileName;
             return this;
         }
 
-        public Channel withChaincodes(Collection<ConfigData.ChannelChaincode> chaincodes) {
-            this.chaincodes = chaincodes;
+        public Users withCertFileName(String certFileName) {
+            this.certFileName = certFileName;
             return this;
         }
 
-        public ConfigData.Channel build() {
-            return new ConfigData.Channel(admin, orderers, peers, eventhubs, txFile, chaincodes);
+        public ConfigData.Users build() {
+            return new ConfigData.Users(userAffiliation, list, caKey, destFilesPath, privateKeyFileName, certFileName);
         }
     }
 
-    public static class EventhubBuilder {
-        private String url;
-        private String name;
-        private FileReference pemFile;
-        private Map<String, String> properties;
-
-        public EventhubBuilder withUrl(String url) {
-            this.url = url;
-            return this;
-        }
-
-        public EventhubBuilder withName(String name) {
-            this.name = name;
-            return this;
-        }
-
-        public EventhubBuilder withPemFile(FileReference pemFile) {
-            this.pemFile = pemFile;
-            return this;
-        }
-
-        public EventhubBuilder withProperties(Map<String, String> properties) {
-            this.properties = properties;
-            return this;
-        }
-
-        public ConfigData.Eventhub build() {
-            return new ConfigData.Eventhub(url, name, pemFile, properties);
-        }
-    }
-
-    public static class OrdererBuilder {
-        private String url;
-        private FileReference pemFile;
-        private Map<String, String> properties;
-
-        public OrdererBuilder withUrl(String url) {
-            this.url = url;
-            return this;
-        }
-
-        public OrdererBuilder withPemFile(FileReference pemFile) {
-            this.pemFile = pemFile;
-            return this;
-        }
-
-        public OrdererBuilder withProperties(Map<String, String> properties) {
-            this.properties = properties;
-            return this;
-        }
-
-        public ConfigData.Orderer build() {
-            return new ConfigData.Orderer(url, pemFile, properties);
-        }
-    }
-
-    public static class PeerBuilder {
-        private String url;
-        private String name;
-        private FileReference pemFile;
-        private Map<String, String> properties;
-
-        public PeerBuilder withUrl(String url) {
-            this.url = url;
-            return this;
-        }
-
-        public PeerBuilder withName(String name) {
-            this.name = name;
-            return this;
-        }
-
-        public PeerBuilder withPemFile(FileReference pemFile) {
-            this.pemFile = pemFile;
-            return this;
-        }
-
-        public PeerBuilder withProperties(Map<String, String> properties) {
-            this.properties = properties;
-            return this;
-        }
-
-        public ConfigData.Peer build() {
-            return new ConfigData.Peer(url, name, pemFile, properties);
-        }
-    }
-
-    public static class Config {
-        private Map<String, ConfigData.Admin> admins;
-        private Map<String, ConfigData.Peer> peers;
-        private Map<String, ConfigData.Orderer> orderers;
-        private Map<String, ConfigData.Channel> channels;
-        private Map<String, ConfigData.CA> cas;
-        private Map<String, ConfigData.Eventhub> eventhubs;
-        private Map<String, ConfigData.Chaincode> chaincodes;
-        private ConfigData.Users users;
-
-        public Config withAdmins(Map<String, ConfigData.Admin> admins) {
-            this.admins = admins;
-            return this;
-        }
-
-        public Config withPeers(Map<String, ConfigData.Peer> peers) {
-            this.peers = peers;
-            return this;
-        }
-
-        public Config withOrderers(Map<String, ConfigData.Orderer> orderers) {
-            this.orderers = orderers;
-            return this;
-        }
-
-        public Config withChannels(Map<String, ConfigData.Channel> channels) {
-            this.channels = channels;
-            return this;
-        }
-
-        public Config withCas(Map<String, ConfigData.CA> cas) {
-            this.cas = cas;
-            return this;
-        }
-
-        public Config withEventhubs(Map<String, ConfigData.Eventhub> eventhubs) {
-            this.eventhubs = eventhubs;
-            return this;
-        }
-
-        public Config withChaincodes(Map<String, ConfigData.Chaincode> chaincodes) {
-            this.chaincodes = chaincodes;
-            return this;
-        }
-
-        public Config withUsers(ConfigData.Users users) {
-            this.users = users;
-            return this;
-        }
-
-        public ConfigData.Root build() {
-            return new ConfigData.Root(admins, peers, orderers, channels, cas, eventhubs, chaincodes, users);
-        }
-    }
 }
