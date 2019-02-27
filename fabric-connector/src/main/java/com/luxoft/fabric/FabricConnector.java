@@ -1,6 +1,5 @@
 package com.luxoft.fabric;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.TransactionEventException;
 import org.slf4j.Logger;
@@ -63,10 +62,6 @@ public class FabricConnector {
         this(null, defaultChannelName, fabricConfig, options);
     }
 
-    public FabricConnector(User user, String defaultChannelname, FabricConfig fabricConfig) throws Exception{
-        this(user, defaultChannelname, fabricConfig, true, null);
-    }
-
     public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig, Boolean initChannels, Options options) throws Exception {
         this.fabricConfig = fabricConfig;
         this.defaultChannelName = defaultChannelName;
@@ -90,8 +85,7 @@ public class FabricConnector {
     }
 
     public void initChannels(Options options) throws Exception {
-        for (Iterator<JsonNode> it = fabricConfig.getChannels(); it.hasNext(); ) {
-            String channel = it.next().fields().next().getKey();
+        for (String channel : fabricConfig.getChannelsKeys()) {
             fabricConfig.initChannel(hfClient, channel, hfClient.getUserContext(), options);
         }
     }
@@ -137,7 +131,7 @@ public class FabricConnector {
         Channel channel = hfClient.getChannel(channelName);
         if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
         fabricConfig.installChaincode(hfClient, new ArrayList<>(channel.getPeers()), chaincodeName);
-        fabricConfig.instantiateChaincode(hfClient, channel, chaincodeName);
+        fabricConfig.instantiateChaincode(hfClient, channel, chaincodeName, null);
     }
 
     public void upgradeChaincode(String chaincodeName, String channelName) throws Exception {

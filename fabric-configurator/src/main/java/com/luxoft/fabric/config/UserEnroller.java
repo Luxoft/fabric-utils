@@ -1,8 +1,7 @@
 package com.luxoft.fabric.config;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.FabricConfig;
-import com.luxoft.fabric.YamlConfig;
+import com.luxoft.fabric.model.ConfigData;
 import org.apache.commons.io.FileUtils;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemWriter;
@@ -13,6 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.security.Key;
+import static com.luxoft.fabric.FabricConfig.getOrDefault;
 
 /**
  * Created by ADoroganov on 11.08.2017.
@@ -34,24 +34,24 @@ public class UserEnroller {
     }
 
     public static void run(FabricConfig fabricConfig) throws Exception {
-        JsonNode usersDetails = fabricConfig.getUsersDetails();
+        ConfigData.Users usersDetails = fabricConfig.getUsersDetails();
         if (usersDetails == null) {
             throw new RuntimeException("User details not found");
         }
 
-        String caKey = usersDetails.get("caKey").asText();
+        String caKey = usersDetails.caKey;
         if (caKey == null) {
-            throw new RuntimeException("caKey should be provided");
+            throw new RuntimeException("users.caKey should be provided");
         }
 
-        String userAffiliation = usersDetails.get("userAffiliation").asText();
+        String userAffiliation = usersDetails.userAffiliation;
         if (userAffiliation == null) {
-            throw new RuntimeException("userAffiliation should be provided");
+            throw new RuntimeException("users.userAffiliation should be provided");
         }
 
-        String destFilesRootPath = usersDetails.path("destFilesPath").asText("users/");
-        String privateKeyFileName = usersDetails.path("privateKeyFileName").asText( "pk.pem");
-        String certFileName = usersDetails.path("certFileName").asText( "cert.pem");
+        String destFilesRootPath = getOrDefault(usersDetails.destFilesPath, "users/");
+        String privateKeyFileName = getOrDefault(usersDetails.privateKeyFileName, "pk.pem");
+        String certFileName = getOrDefault(usersDetails.certFileName, "cert.pem");
 
         logger.info("Enrolling users at CA {}", caKey);
         logger.info("Reading users with affiliation ({}) and storing at ({}%%username%%) with cert in ({}) and pk in ({})",
@@ -59,8 +59,7 @@ public class UserEnroller {
 
         long cnt = 0;
 
-        for (JsonNode userNode : usersDetails.get("list")) {
-            String userName = userNode.textValue();
+        for (String userName : usersDetails.list) {
 
             logger.info("Processing user " + userName);
             HFCAClient hfcaClient = fabricConfig.createHFCAClient(caKey, null);
