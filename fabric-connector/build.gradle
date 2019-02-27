@@ -11,16 +11,6 @@ repositories {
     mavenCentral()
 }
 
-//configurations {
-//    compile {
-//        exclude module: 'grpc-netty'
-//        exclude module: 'grpc-protobuf'
-//        exclude module: 'grpc-stub'
-//        exclude group: 'io.grpc', module: 'grpc-netty'
-//        exclude group: 'io.netty', module: 'netty-codec-http2'
-//    }
-//}
-
 dependencies {
     [ null, 'sources', 'javadoc' ].collect {
         compile group: 'org.hyperledger.fabric-sdk-java', name: 'fabric-sdk-java', version: '1.4.0', classifier: it

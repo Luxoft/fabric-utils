@@ -1,5 +1,5 @@
 group 'com.luxoft'
-version '1.4.0'
+version '1.4.1'
 ext.mavenLocalGroupId = 'com.github.Luxoft'
 
 apply plugin: 'maven-publish'
