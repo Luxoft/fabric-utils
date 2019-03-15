@@ -3,6 +3,7 @@ package com.luxoft.fabric;
 import com.luxoft.fabric.config.NetworkManager;
 import org.apache.commons.io.IOUtils;
 import org.hyperledger.fabric.sdk.BlockEvent;
+import org.hyperledger.fabric.sdk.NetworkConfig;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -28,6 +29,7 @@ public class FabricConnectorIntegrationTest {
 
     private static FabricConfig fabricConfig;
     private static final Logger LOG = LoggerFactory.getLogger(FabricConnectorIntegrationTest.class);
+    private static final  String NETWORK_CONFIG_FILE = FabricConnectorIntegrationTest.class.getClassLoader().getResource("network-config.yaml").getFile();
 
     @BeforeClass
     public static void setUp() throws Exception {
@@ -57,7 +59,27 @@ public class FabricConnectorIntegrationTest {
     @Test
     public void testSanityCheck() throws Exception {
         LOG.info("Starting SanityCheck");
-        FabricConnector fabricConnector = new FabricConnector(fabricConfig);
+        FabricConnector fabricConnector = FabricConnector.getFabricConfigBuilder(fabricConfig).build();
+
+        byte[] key = "someKey".getBytes();
+        byte[] value = UUID.randomUUID().toString().getBytes();
+
+        CompletableFuture<BlockEvent.TransactionEvent> putEventFuture = fabricConnector.invoke(
+                "put", "mychcode", "mychannel", key, value);
+        Assert.assertNotNull(putEventFuture.get());
+
+        CompletableFuture<byte[]> queryFuture = fabricConnector.query(
+                "get", "mychcode", "mychannel", key);
+        Assert.assertArrayEquals(value, queryFuture.get());
+        LOG.info("Finished SanityCheck");
+    }
+
+    @Test
+    public void testNetworkConfigSanityCheck() throws Exception {
+        LOG.info("Starting SanityCheck");
+        
+        NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File(NETWORK_CONFIG_FILE));
+        FabricConnector fabricConnector = FabricConnector.getNetworkConfigBuilder(networkConfig).build();
 
         byte[] key = "someKey".getBytes();
         byte[] value = UUID.randomUUID().toString().getBytes();
@@ -75,7 +97,7 @@ public class FabricConnectorIntegrationTest {
     @Test
     public void testTxRace() throws Exception {
         LOG.info("Starting testTxRace");
-        FabricConnector fabricConnector = new FabricConnector(fabricConfig);
+        FabricConnector fabricConnector = FabricConnector.getFabricConfigBuilder(fabricConfig).build();
 
         AtomicInteger success = new AtomicInteger();
 

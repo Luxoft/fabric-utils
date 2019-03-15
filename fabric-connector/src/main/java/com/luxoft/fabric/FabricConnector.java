@@ -1,10 +1,15 @@
 package com.luxoft.fabric;
 
+
+import com.luxoft.fabric.impl.FabricConnectorImplBasedOnFabricConfig;
+import com.luxoft.fabric.impl.FabricConnectorImplBasedOnNetworkConfig;
 import org.hyperledger.fabric.sdk.*;
+import org.hyperledger.fabric.sdk.exception.CryptoException;
+import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.TransactionEventException;
+import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -15,7 +20,14 @@ import static org.hyperledger.fabric.protos.peer.FabricTransaction.TxValidationC
 /**
  * Created by nvolkov on 26.07.17.
  */
-public class FabricConnector {
+public abstract class  FabricConnector {
+
+    public static HFClient createHFClient() throws CryptoException, InvalidArgumentException {
+        CryptoSuite cryptoSuite = FabricConfig.getCryptoSuite();
+        HFClient hfClient = HFClient.createNewInstance();
+        hfClient.setCryptoSuite(cryptoSuite);
+        return hfClient;
+    }
 
     public static class Options {
         EventTracker eventTracker;
@@ -33,62 +45,28 @@ public class FabricConnector {
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
     protected HFClient hfClient;
-    protected FabricConfig fabricConfig;
+
 
     private String defaultChannelName;
     private int defaultMaxRetries = 3;
 
-    public FabricConnector(FabricConfig fabricConfig, Boolean initChannels) throws Exception {
-        this(null, null, fabricConfig, initChannels, null);
-    }
 
-    public FabricConnector(FabricConfig fabricConfig, Boolean initChannels, Options options) throws Exception {
-        this(null, null, fabricConfig, initChannels, options);
-    }
-
-    public FabricConnector(FabricConfig fabricConfig) throws Exception {
-        this(null, null, fabricConfig, null);
-    }
-
-    public FabricConnector(FabricConfig fabricConfig, Options options) throws Exception {
-        this(null, null, fabricConfig, options);
-    }
-
-    public FabricConnector(User user, FabricConfig fabricConfig, Options options) throws Exception {
-        this(user, null, fabricConfig, options);
-    }
-
-    public FabricConnector(String defaultChannelName, FabricConfig fabricConfig, Options options) throws Exception {
-        this(null, defaultChannelName, fabricConfig, options);
-    }
-
-    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig, Boolean initChannels, Options options) throws Exception {
-        this.fabricConfig = fabricConfig;
+    public void initConnector(User user, String defaultChannelName, Boolean initChannels, Options options) throws Exception {
         this.defaultChannelName = defaultChannelName;
+        hfClient = createHFClient();
 
-        hfClient = FabricConfig.createHFClient();
+        initUserContext(user);
 
-        if (user != null)
-            hfClient.setUserContext(user);
-        else if (hfClient.getUserContext() == null)
-            hfClient.setUserContext(fabricConfig.getAdmin(fabricConfig.getAdminsKeys().get(0)));
+        if (initChannels)
+            initChannels(options);
 
-        if (initChannels) initChannels(options);
     }
 
-    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig, FabricConnector.Options options) throws Exception {
-        this(user, defaultChannelName, fabricConfig, true, options);
-    }
 
-    public void initChannels() throws Exception {
-        initChannels(null);
-    }
+    protected abstract void initUserContext(User user) throws Exception;
 
-    public void initChannels(Options options) throws Exception {
-        for (String channel : fabricConfig.getChannelsKeys()) {
-            fabricConfig.initChannel(hfClient, channel, hfClient.getUserContext(), options);
-        }
-    }
+
+    public abstract void initChannels(Options options) throws Exception;
 
     public int getDefaultMaxRetries() {
         return defaultMaxRetries;
@@ -102,15 +80,11 @@ public class FabricConnector {
         return hfClient;
     }
 
-    public FabricConfig getFabricConfig() {
-        return fabricConfig;
-    }
-
-    public Channel getChannel(String channelName)
-    {
+    public Channel getChannel(String channelName) {
         return getHfClient().getChannel(channelName);
     }
 
+    @SuppressWarnings("unused")
     public Channel getDefaultChannel() {
         return getChannel(defaultChannelName);
     }
@@ -119,26 +93,6 @@ public class FabricConnector {
         hfClient.setUserContext(user);
     }
 
-    public void deployChaincode(String chaincodeName) throws Exception {
-        deployChaincode(chaincodeName, defaultChannelName);
-    }
-
-    public void upgradeChaincode(String chaincodeName) throws Exception {
-        upgradeChaincode(chaincodeName, defaultChannelName);
-    }
-
-    public void deployChaincode(String chaincodeName, String channelName) throws Exception {
-        Channel channel = hfClient.getChannel(channelName);
-        if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
-        fabricConfig.installChaincode(hfClient, new ArrayList<>(channel.getPeers()), chaincodeName);
-        fabricConfig.instantiateChaincode(hfClient, channel, chaincodeName, null);
-    }
-
-    public void upgradeChaincode(String chaincodeName, String channelName) throws Exception {
-        Channel channel = hfClient.getChannel(channelName);
-        if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
-        fabricConfig.upgradeChaincode(hfClient, channel, new ArrayList<>(channel.getPeers()), chaincodeName);
-    }
 
     public TransactionProposalRequest buildProposalRequest(String function, String chaincode, byte[][] message) {
 
@@ -159,7 +113,7 @@ public class FabricConnector {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 Channel channel = hfClient.getChannel(channelName);
-                if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
+                if (channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
                 Collection<ProposalResponse> proposalResponses = channel.sendTransactionProposal(transactionProposalRequest, channel.getPeers());
                 Collection<ProposalResponse> successful = new LinkedList<>();
 
@@ -192,6 +146,7 @@ public class FabricConnector {
         });
     }
 
+    @SuppressWarnings("unused")
     public CompletableFuture<BlockEvent.TransactionEvent> sendTransaction(TransactionProposalRequest transactionProposalRequest) {
         return sendTransaction(transactionProposalRequest, defaultChannelName);
     }
@@ -202,7 +157,7 @@ public class FabricConnector {
             CompletableFuture<BlockEvent.TransactionEvent> future = null;
             try {
                 Channel channel = hfClient.getChannel(channelName);
-                if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
+                if (channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
                 future = channel.sendTransaction(proposalResponses);
             } catch (Exception e) {
                 logger.error("Failed to send transaction to channel", e);
@@ -231,7 +186,7 @@ public class FabricConnector {
             ProposalResponse lastFailProposal = null;
             try {
                 Channel channel = hfClient.getChannel(channelName);
-                if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
+                if (channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
                 final Collection<ProposalResponse> proposalResponses = channel.queryByChaincode(request);
                 for (ProposalResponse proposalResponse : proposalResponses) {
                     if (!proposalResponse.isVerified() || proposalResponse.getStatus() != ProposalResponse.Status.SUCCESS) {
@@ -252,6 +207,7 @@ public class FabricConnector {
         });
     }
 
+    @SuppressWarnings("unused")
     public CompletableFuture<byte[]> query(String function, String chaincode, byte[]... message) {
         return query(function, chaincode, defaultChannelName, message);
     }
@@ -278,12 +234,12 @@ public class FabricConnector {
         // Here we handle retry 'maxRetries' times
         // Basically we just chain N(='maxRetries') dummy futures that push successful one further
         // In case of exception it checks transaction error code and either push forward the exception or recreates transaction on retry-able errors
-        for(int i = 0; i < maxRetries; i++) {
+        for (int i = 0; i < maxRetries; i++) {
             f = f.thenApply(CompletableFuture::completedFuture)
                     .exceptionally(t -> {
                         try {
                             int validationCode = ((TransactionEventException) t.getCause()).getTransactionEvent().getValidationCode();
-                            switch(validationCode) {
+                            switch (validationCode) {
                                 case MVCC_READ_CONFLICT_VALUE:
                                 case PHANTOM_READ_CONFLICT_VALUE:
                                     logger.error("", t);
@@ -309,4 +265,46 @@ public class FabricConnector {
         cf.completeExceptionally(t);
         return cf;
     }
+
+    public static FabricConnectorImplBasedOnFabricConfig.Builder getFabricConfigBuilder(FabricConfig fabricConfig) {
+        return new FabricConnectorImplBasedOnFabricConfig.Builder(fabricConfig);
+    }
+
+    public static FabricConnectorImplBasedOnNetworkConfig.Builder getNetworkConfigBuilder(NetworkConfig networkConfig) {
+        return new FabricConnectorImplBasedOnNetworkConfig.Builder(networkConfig);
+    }
+
+
+    public abstract static class Builder {
+
+        protected Boolean initChannels = true;
+        protected User user;
+        protected String defaultChannelName;
+        protected Options options;
+
+        public Builder withInitChannels(Boolean initChannels) {
+            this.initChannels = initChannels;
+            return this;
+        }
+
+        public Builder withUser(User user) {
+            this.user = user;
+            return this;
+        }
+
+        public Builder withDefaultChannelName(String defaultChannelName) {
+            this.defaultChannelName = defaultChannelName;
+            return this;
+        }
+
+        public Builder withOptions(Options options) {
+            this.options = options;
+            return this;
+        }
+
+        public abstract FabricConnector build() throws Exception;
+
+
+    }
+
 }

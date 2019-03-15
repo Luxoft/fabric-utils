@@ -102,13 +102,6 @@ public class FabricConfig {
             return channels;
     }
 
-    public static HFClient createHFClient() throws CryptoException, InvalidArgumentException {
-        CryptoSuite cryptoSuite = getCryptoSuite();
-        HFClient hfClient = HFClient.createNewInstance();
-        hfClient.setCryptoSuite(cryptoSuite);
-        return hfClient;
-    }
-
     public ConfigData.Channel getChannelDetails(String key) {
         return getRoot().channels.get(key);
     }

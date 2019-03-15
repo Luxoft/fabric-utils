@@ -1,0 +1,103 @@
+---
+name: "Network-Config-Test"
+description: "The network used in the integration tests"
+version: 1.0.0
+
+client:
+  # Which organization does this application instance belong to? The value must be the name of an org
+  # defined under "organizations"
+  organization: Org1
+
+  # Some SDKs support pluggable KV stores, the properties under "credentialStore"
+  # are implementation specific
+  credentialStore:
+    # [Optional]. Specific to FileKeyValueStore.js or similar implementations in other SDKs. Can be others
+    # if using an alternative impl. For instance, CouchDBKeyValueStore.js would require an object
+    # here for properties like url, db name, etc.
+    path: "/tmp/hfc-kvs"
+
+    # [Optional]. Specific to the CryptoSuite implementation. Software-based implementations like
+    # CryptoSuite_ECDSA_AES.js in node SDK requires a key store. PKCS#11 based implementations does
+    # not.
+    cryptoStore:
+      # Specific to the underlying KeyValueStore that backs the crypto key store.
+      path: "/tmp/hfc-cvs"
+
+    # [Optional]. Specific to Composer environment
+    wallet: wallet-name
+
+#
+# [Optional]. But most apps would have this section so that channel objects can be constructed
+# based on the content below. If an app is creating channels, then it likely will not need this
+# section.
+#
+channels:
+  mychannel:
+    orderers:
+      - orderer
+    peers:
+      peer0.org1.example.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+    chaincodes:
+      - mychcode:v1
+
+#
+# list of participating organizations in this network
+#
+organizations:
+  Org1:
+    mspid: Org1MSP
+    peers:
+      - peer0.org1.example.com
+    certificateAuthorities:
+      - ca.org1.example.com
+    adminPrivateKey:
+      path: ../files/artifacts/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/keystore/5890f0061619c06fb29dea8cb304edecc020fe63f41a6db109f1e227cc1cb2a8_sk
+
+    signedCert:
+      path: ../files/artifacts/crypto-config/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp/signcerts/Admin@org1.example.com-cert.pem
+
+orderers:
+  orderer:
+    url: grpcs://localhost:7050
+    grpcOptions:
+      ssl-target-name-override: orderer.example.com
+      sslProvider: openSSL
+      negotiationType: TLS
+      hostnameOverride: orderer.example.com
+      grpc-max-send-message-length: 15
+      grpc.keepalive_time_ms: 360000
+      grpc.keepalive_timeout_ms: 180000
+    tlsCACerts:
+      path: ../files/artifacts/crypto-config/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem
+
+
+peers:
+  peer0.org1.example.com:
+    url: grpcs://localhost:7051
+    grpcOptions:
+      grpc.http2.keepalive_time: 15
+      ssl-target-name-override: peer0.org1.example.com
+      negotiationType: TLS
+      sslProvider: openSSL
+      hostnameOverride: peer0.org1.example.com
+    tlsCACerts:
+      path: ../files/artifacts/crypto-config/peerOrganizations/org1.example.com/tlsca/tlsca.org1.example.com-cert.pem
+
+certificateAuthorities:
+  ca.org1.example.com:
+    url: https://localhost:7054
+    httpOptions:
+      verify: true
+    tlsCACerts:
+      path: ../files/artifacts/crypto-config/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem
+
+    # Fabric-CA supports dynamic user enrollment via REST APIs. A "root" user, a.k.a registrar, is
+    # needed to enroll and invoke new users.
+    registrar: #single entitiy
+      enrollId: admin
+      enrollSecret: adminpw
+

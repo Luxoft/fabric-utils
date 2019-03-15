@@ -1,6 +1,7 @@
 package com.luxoft.fabric.config;
 
 import com.luxoft.fabric.FabricConfig;
+import com.luxoft.fabric.FabricConnector;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 import joptsimple.OptionSpec;
@@ -119,7 +120,7 @@ public class Configurator {
                 destFilePath = srcFilePath + ".sign";
 
             byte[] fileContent = FileUtils.readFileToByteArray(new File(srcFilePath));
-            byte[] channelUpdateConfigSignature = cfg.signChannelUpdateConfig(FabricConfig.createHFClient(), fabricConfig, fileContent, adminName);
+            byte[] channelUpdateConfigSignature = cfg.signChannelUpdateConfig(FabricConnector.createHFClient(), fabricConfig, fileContent, adminName);
             FileUtils.writeByteArrayToFile(new File(destFilePath), channelUpdateConfigSignature);
         } else if (mode.equals(Arguments.SET_CHANNEL)) {
             String srcFilePath = requireNonNull(options.valueOf(src), "'src' argument required with path to updated config proto file");
@@ -156,7 +157,7 @@ public class Configurator {
             FileUtils.writeByteArrayToFile(new File(destFilePath), updatedChannel);
         } else {
 
-            HFClient hfClient = FabricConfig.createHFClient();
+            HFClient hfClient = FabricConnector.createHFClient();
 
             Set<String> names = options.has(name)
                     ? new HashSet<>(options.valuesOf(name))
