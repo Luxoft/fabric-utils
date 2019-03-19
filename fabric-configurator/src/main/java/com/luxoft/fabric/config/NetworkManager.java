@@ -3,6 +3,7 @@ package com.luxoft.fabric.config;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.FabricConfig;
 import com.luxoft.fabric.FabricConnector;
+import com.luxoft.fabric.impl.FabricConnectorImplBasedOnFabricConfig;
 import com.luxoft.fabric.model.ConfigData;
 import com.luxoft.fabric.utils.MiscUtils;
 import org.hyperledger.fabric.protos.common.Common;
@@ -426,4 +427,33 @@ public class NetworkManager {
             }
         }
     }
+
+
+    @SuppressWarnings("unused")
+    public static void deployChaincode(FabricConnectorImplBasedOnFabricConfig fabricConnector, String chaincodeName) throws Exception {
+        deployChaincode(fabricConnector, chaincodeName, fabricConnector.getDefaultChannel().getName());
+    }
+
+    @SuppressWarnings("unused")
+    public static void upgradeChaincode(FabricConnectorImplBasedOnFabricConfig fabricConnector, String chaincodeName) throws Exception {
+        upgradeChaincode(fabricConnector, chaincodeName, fabricConnector.getDefaultChannel().getName());
+    }
+
+
+    public static void deployChaincode(FabricConnectorImplBasedOnFabricConfig fabricConnector, String chaincodeName, String channelName) throws Exception {
+        HFClient hfClient = fabricConnector.getHfClient();
+        Channel channel = hfClient.getChannel(channelName);
+        if (channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
+        fabricConnector.getFabricConfig().installChaincode(hfClient, new ArrayList<>(channel.getPeers()), chaincodeName);
+        fabricConnector.getFabricConfig().instantiateChaincode(hfClient, channel, chaincodeName, null);
+    }
+
+    public static void upgradeChaincode(FabricConnectorImplBasedOnFabricConfig fabricConnector, String chaincodeName, String channelName) throws Exception {
+        HFClient hfClient = fabricConnector.getHfClient();
+        Channel channel = hfClient.getChannel(channelName);
+        if (channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
+        fabricConnector.getFabricConfig().upgradeChaincode(hfClient, channel, new ArrayList<>(channel.getPeers()), chaincodeName);
+    }
+
+
 }
