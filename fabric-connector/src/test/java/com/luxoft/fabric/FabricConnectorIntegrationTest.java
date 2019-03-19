@@ -4,6 +4,7 @@ import com.luxoft.fabric.config.NetworkManager;
 import org.apache.commons.io.IOUtils;
 import org.hyperledger.fabric.sdk.BlockEvent;
 import org.hyperledger.fabric.sdk.NetworkConfig;
+import org.hyperledger.fabric.sdk.User;
 import org.junit.AfterClass;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -143,6 +144,35 @@ public class FabricConnectorIntegrationTest {
         assertTrue(finalValue.equals(value1) || finalValue.equals(value2));
         assertEquals(2, success.get());
         LOG.info("Finished testTxRace");
+    }
+
+
+    @Test
+    public void enrollAndRegisterUsingFabricConfigTest() throws Exception {
+
+        FabricConnector fabricConnector = FabricConnector.getFabricConfigBuilder(fabricConfig).build();
+        User adminUser = fabricConnector.enrollUser("ca.org1.example.com", "admin", "adminpw");
+
+        Assert.assertNotNull(adminUser);
+
+        String userSecret = fabricConnector.registerUser("ca.org1.example.com", "testUser1", "org1");
+
+        Assert.assertNotNull(userSecret);
+    }
+
+    @Test
+    public void enrollAndRegisterUsingNetworkConfigTest() throws Exception {
+
+        NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File(NETWORK_CONFIG_FILE));
+        FabricConnector fabricConnector = FabricConnector.getNetworkConfigBuilder(networkConfig).build();
+        User adminUser = fabricConnector.enrollUser("ca.org1.example.com", "admin", "adminpw");
+
+        Assert.assertNotNull(adminUser);
+
+        String userSecret = fabricConnector.registerUser("ca.org1.example.com", "testUser2", "org1");
+
+        Assert.assertNotNull(userSecret);
+
     }
 
     private static int execInDirectory(String cmd, String dir) {

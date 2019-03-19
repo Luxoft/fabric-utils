@@ -91,7 +91,7 @@ certificateAuthorities:
   ca.org1.example.com:
     url: https://localhost:7054
     httpOptions:
-      verify: true
+      verify: false
     tlsCACerts:
       path: ../files/artifacts/crypto-config/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem
 
