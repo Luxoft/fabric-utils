@@ -27,7 +27,16 @@ public class FabricConnectorImplBasedOnFabricConfig extends FabricConnector {
         for (String channel : fabricConfig.getChannelsKeys()) {
             fabricConfig.initChannel(hfClient, channel, hfClient.getUserContext(), options);
         }
+    }
 
+    @Override
+    public User enrollUser(String caKey, String userName, String userSecret) throws Exception {
+        return fabricConfig.enrollUser(caKey, userName, userSecret);
+    }
+
+    @Override
+    public String registerUser(String caKey, String userName, String userAffiliation) throws Exception {
+        return fabricConfig.registerUser(caKey, userName, userAffiliation);
     }
 
     public static class Builder  extends FabricConnector.Builder {
@@ -42,6 +51,10 @@ public class FabricConnectorImplBasedOnFabricConfig extends FabricConnector {
             return new FabricConnectorImplBasedOnFabricConfig(user, defaultChannelName, fabricConfig, initChannels, options);
         }
 
+    }
+
+    public FabricConfig getFabricConfig() {
+        return fabricConfig;
     }
 
 }

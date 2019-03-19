@@ -29,6 +29,16 @@ public class FabricConnectorImplBasedOnNetworkConfig extends FabricConnector {
 
     }
 
+    @Override
+    public User enrollUser(String caKey, String userName, String userSecret) throws Exception {
+        throw new UnsupportedOperationException("This operation was not yet implemented");
+    }
+
+    @Override
+    public String registerUser(String caKey, String userName, String userAffiliation) throws Exception {
+        throw new UnsupportedOperationException("This operation was not yet implemented");
+    }
+
     public static class Builder extends FabricConnector.Builder{
 
         private NetworkConfig networkConfig;

@@ -1,5 +1,6 @@
 package com.luxoft.fabric;
 
+import com.luxoft.fabric.impl.FabricConnectorImplBasedOnFabricConfig;
 import org.hyperledger.fabric.sdk.Channel;
 import org.hyperledger.fabric.sdk.HFClient;
 import org.hyperledger.fabric.sdk.User;
@@ -34,16 +35,12 @@ public class FabricConfigurator {
         fabricConfig.upgradeChaincode(hfClient, channel, new ArrayList<>(channel.getPeers()), chaincodeName);
     }
 
-    public FabricConfigurator(User user, String defaultChannelName, FabricConfig fabricConfig) throws Exception {
-        this.fabricConfig = fabricConfig;
-        this.defaultChannelName = defaultChannelName;
 
-        hfClient = FabricConnector.createHFClient();
-
-        if (user != null)
-            hfClient.setUserContext(user);
-        else if (hfClient.getUserContext() == null)
-            hfClient.setUserContext(fabricConfig.getAdmin(fabricConfig.getAdminsKeys().get(0)));
+    @SuppressWarnings("unused")
+    public FabricConfigurator(FabricConnectorImplBasedOnFabricConfig fabricConnector) {
+        this.hfClient = fabricConnector.getHfClient();
+        this.fabricConfig = fabricConnector.getFabricConfig();
+        this.defaultChannelName = fabricConnector.getDefaultChannel().getName();
 
     }
 

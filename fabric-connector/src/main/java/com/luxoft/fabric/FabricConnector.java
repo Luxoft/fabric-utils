@@ -274,6 +274,12 @@ public abstract class  FabricConnector {
         return new FabricConnectorImplBasedOnNetworkConfig.Builder(networkConfig);
     }
 
+    @SuppressWarnings("unused")
+    public abstract User enrollUser(String caKey, String userName, String userSecret) throws Exception;
+
+    @SuppressWarnings("unused")
+    public abstract String registerUser(String caKey, String userName, String userAffiliation) throws Exception;
+
 
     public abstract static class Builder {
 
