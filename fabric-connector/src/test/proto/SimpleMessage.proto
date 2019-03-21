@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+option java_package = 'com.luxoft.fabric.integration.proto';
+option go_package = 'main';
+option java_outer_classname = 'SimpleMessage';
+
+message Message {
+    string payload = 1;
+}

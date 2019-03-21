@@ -1,14 +1,31 @@
 group 'com.luxoft'
 version rootProject.version
 
+ext.grpcVersion = '1.1.2'
+
+apply plugin: 'com.google.protobuf'
 apply plugin: 'java'
 apply plugin: 'maven-publish'
+
 
 sourceCompatibility = 1.8
 
 repositories {
     mavenLocal()
     mavenCentral()
+}
+
+
+buildscript {
+    repositories {
+        maven {
+            mavenCentral()
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath 'com.google.protobuf:protobuf-gradle-plugin:0.8.0'
+    }
 }
 
 dependencies {
@@ -27,6 +44,8 @@ dependencies {
 
     testCompile project(':fabric-configurator')
     testCompile group: 'junit', name: 'junit', version: '4.12'
+    testCompile 'com.google.protobuf:protobuf-java:3.0.0'
+
 }
 
 publishing {
@@ -38,3 +57,45 @@ publishing {
         }
     }
 }
+
+sourceSets {
+    test {
+        proto {
+            srcDir 'src/test/proto'
+        }
+        java {
+            srcDirs += "${protobuf.generatedFilesBaseDir}/test/java"
+        }
+    }    
+}
+
+protobuf {
+    protoc {artifact = 'com.google.protobuf:protoc:3.0.2'}
+    plugins {
+        grpc { artifact = "io.grpc:protoc-gen-grpc-java:${grpcVersion}" }
+    }
+    generateProtoTasks {
+        all()*.plugins {
+            grpc {
+                // To generate deprecated interfaces and static bindService method,
+                // turn the enable_deprecated option to true below:
+                option 'enable_deprecated=false'
+            }
+        }
+        // generate descriptors:
+        all().each { task ->
+            task.generateDescriptorSet = true
+            task.descriptorSetOptions.includeImports = true
+            task.builtins {
+                go { }
+            }
+        }
+    }
+}
+
+task copyProtoToChainCodeDirectory(type: Copy) {
+    from "build/generated/source/proto/test/go"
+    into "../files/chaincode/src/map"
+}
+
+testClasses.finalizedBy copyProtoToChainCodeDirectory
