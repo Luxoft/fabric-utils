@@ -1,7 +1,7 @@
 package com.luxoft.fabric.integration;
 
 import com.luxoft.fabric.FabricConfig;
-import com.luxoft.fabric.config.NetworkManager;
+import com.luxoft.fabric.configurator.NetworkManager;
 import org.apache.commons.io.IOUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
@@ -15,6 +15,7 @@ import java.nio.charset.Charset;
 public class BaseIntegrationTest {
 
     static FabricConfig fabricConfig;
+    static final String NETWORK_CONFIG_FILE = FabricConnectorIntegrationTest.class.getClassLoader().getResource("network-config.yaml").getFile();
 
     private static final Logger LOG = LoggerFactory.getLogger(BaseIntegrationTest.class);
 

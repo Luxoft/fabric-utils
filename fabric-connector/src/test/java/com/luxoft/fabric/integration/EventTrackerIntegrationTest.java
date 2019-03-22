@@ -4,6 +4,7 @@ import com.luxoft.fabric.EventTracker;
 import com.luxoft.fabric.FabricConnector;
 import com.luxoft.fabric.OrderingEventTracker;
 import com.luxoft.fabric.Persister;
+import com.luxoft.fabric.config.ConfigAdapter;
 import com.luxoft.fabric.integration.proto.SimpleMessage;
 import org.hyperledger.fabric.sdk.BlockEvent;
 import org.hyperledger.fabric.sdk.ChaincodeEvent;
@@ -25,8 +26,6 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
     @Test
     public void testSimpleEventsWithFabricConfig() throws Exception {
 
-        FabricConnector.Options options = new FabricConnector.Options();
-
         EventTracker eventTracker = new OrderingEventTracker(new Persister() {
             @Override
             public long getStartBlock(String channelName) {
@@ -43,10 +42,10 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
         ((OrderingEventTracker) eventTracker).enableEventsDelivery();
         ((OrderingEventTracker) eventTracker).addEventListener("mychcode", ".*", SimpleMessage.Message.class, testEventListener);
 
-        options.setEventTracker(eventTracker);
-
-        FabricConnector fabricConnector = FabricConnector.getFabricConfigBuilder(fabricConfig)
-                .withOptions(options).build();
+        FabricConnector fabricConnector = new FabricConnector(
+                ConfigAdapter.getBuilder(fabricConfig)
+                        .withEventtracker(eventTracker)
+                        .build());
 
 
         byte[] key = "someKey".getBytes();

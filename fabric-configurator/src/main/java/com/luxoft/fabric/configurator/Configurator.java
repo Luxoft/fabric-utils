@@ -1,4 +1,4 @@
-package com.luxoft.fabric.config;
+package com.luxoft.fabric.configurator;
 
 import com.luxoft.fabric.FabricConfig;
 import com.luxoft.fabric.FabricConnector;

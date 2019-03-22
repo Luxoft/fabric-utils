@@ -1,6 +1,8 @@
 package com.luxoft.fabric.integration;
 
 import com.luxoft.fabric.FabricConnector;
+import com.luxoft.fabric.config.*;
+import com.luxoft.fabric.FabricConnector;
 import org.hyperledger.fabric.sdk.BlockEvent;
 import org.hyperledger.fabric.sdk.NetworkConfig;
 import org.hyperledger.fabric.sdk.User;
@@ -27,20 +29,14 @@ public class FabricConnectorIntegrationTest extends BaseIntegrationTest {
     private static final Logger LOG = LoggerFactory.getLogger(FabricConnectorIntegrationTest.class);
     private static final  String NETWORK_CONFIG_FILE = FabricConnectorIntegrationTest.class.getClassLoader().getResource("network-config.yaml").getFile();
 
-    private static final String CA_KEY = "ca.org1.example.com";
-    private static final String USER_AFFILATION = "org1";
-    private static final String ADMIN = "admin";
-    private static final String ADMIN_PASSWORD = "adminpw";
-
-
-
     /**
      * Write smth to blockchain and query it
      */
     @Test
     public void testSanityCheck() throws Exception {
         LOG.info("Starting SanityCheck");
-        FabricConnector fabricConnector = FabricConnector.getFabricConfigBuilder(fabricConfig).build();
+
+        FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(fabricConfig).build());
 
         byte[] key = "someKey".getBytes();
         byte[] value = UUID.randomUUID().toString().getBytes();
@@ -60,7 +56,7 @@ public class FabricConnectorIntegrationTest extends BaseIntegrationTest {
         LOG.info("Starting SanityCheck");
         
         NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File(NETWORK_CONFIG_FILE));
-        FabricConnector fabricConnector = FabricConnector.getNetworkConfigBuilder(networkConfig).build();
+        FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(networkConfig).build());
 
         byte[] key = "someKey".getBytes();
         byte[] value = UUID.randomUUID().toString().getBytes();
@@ -78,7 +74,7 @@ public class FabricConnectorIntegrationTest extends BaseIntegrationTest {
     @Test
     public void testTxRace() throws Exception {
         LOG.info("Starting testTxRace");
-        FabricConnector fabricConnector = FabricConnector.getFabricConfigBuilder(fabricConfig).build();
+        FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(fabricConfig).build());
 
         AtomicInteger success = new AtomicInteger();
 
@@ -127,33 +123,6 @@ public class FabricConnectorIntegrationTest extends BaseIntegrationTest {
     }
 
 
-    @Test
-    public void enrollAndRegisterUsingFabricConfigTest() throws Exception {
-
-        FabricConnector fabricConnector = FabricConnector.getFabricConfigBuilder(fabricConfig).build();
-        User adminUser = fabricConnector.enrollUser(CA_KEY, ADMIN, ADMIN_PASSWORD);
-
-        Assert.assertNotNull(adminUser);
-
-        String userSecret = fabricConnector.registerUser(CA_KEY, "testUser1", USER_AFFILATION);
-
-        Assert.assertNotNull(userSecret);
-    }
-
-    @Test
-    public void enrollAndRegisterUsingNetworkConfigTest() throws Exception {
-
-        NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File(NETWORK_CONFIG_FILE));
-        FabricConnector fabricConnector = FabricConnector.getNetworkConfigBuilder(networkConfig).build();
-        User adminUser = fabricConnector.enrollUser(CA_KEY, ADMIN, ADMIN_PASSWORD);
-
-        Assert.assertNotNull(adminUser);
-
-        String userSecret = fabricConnector.registerUser(CA_KEY, "testUser2", USER_AFFILATION);
-
-        Assert.assertNotNull(userSecret);
-
-    }
 
 
 }
