@@ -469,6 +469,7 @@ public class OrderingEventTracker implements EventTracker {
                     final String eventName = chaincodeEvent.getEventName();
 
                     try {
+                        //TODO: modify here to add possibility of having payload of different type
                         final Method newBuilder = listenerInfo.paramClass.getMethod("newBuilder");
                         final Message.Builder builder = (Message.Builder) newBuilder.invoke(null);
                         final Message message;
@@ -628,6 +629,7 @@ public class OrderingEventTracker implements EventTracker {
         return true;
     }
 
+    //TODO: modify here to add possibility of having payload of different type
     public <T extends Message> void addEventListener(String chaincodeName, String eventName, Class<T> parameterClass, EventListener<T> listener) {
         final EventListenerInfo eventListenerInfo = new EventListenerInfo(
                 Pattern.compile(chaincodeName),

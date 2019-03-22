@@ -1,9 +1,7 @@
 package com.luxoft.fabric.config;
 
 import com.luxoft.fabric.EventTracker;
-import org.hyperledger.fabric.sdk.NetworkConfig;
-import org.hyperledger.fabric.sdk.HFClient;
-import org.hyperledger.fabric.sdk.User;
+import org.hyperledger.fabric.sdk.*;
 
 public class NetworkConfigAdapterImpl extends AbstractConfigAdapter {
 
@@ -22,11 +20,24 @@ public class NetworkConfigAdapterImpl extends AbstractConfigAdapter {
 
     }
 
+    /*TODO: add some warning to the method that it does not support:
+     *   - EventTracker.getStartBlock(Channel channel)
+     *   - Eventtracker.useFilteredBlocks(Channel channel)
+     *  due to limitations of NetworkConfig     *
+     */
     @Override
     public void initChannels(HFClient hfClient) throws Exception {
 
         for (String channelName : networkConfig.getChannelNames()) {
-            hfClient.loadChannelFromConfig(channelName, networkConfig).initialize();
+            Channel channel = hfClient.loadChannelFromConfig(channelName, networkConfig);
+            if (eventTracker != null)
+                eventTracker.configureChannel(channel);
+
+            channel.initialize();
+
+            if (eventTracker != null)
+                eventTracker.connectChannel(channel);
+
         }
 
     }

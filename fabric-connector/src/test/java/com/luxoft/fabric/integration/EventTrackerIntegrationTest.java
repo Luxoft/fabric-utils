@@ -1,5 +1,6 @@
 package com.luxoft.fabric.integration;
 
+import com.google.protobuf.InvalidProtocolBufferException;
 import com.luxoft.fabric.EventTracker;
 import com.luxoft.fabric.FabricConnector;
 import com.luxoft.fabric.OrderingEventTracker;
@@ -8,44 +9,68 @@ import com.luxoft.fabric.config.ConfigAdapter;
 import com.luxoft.fabric.integration.proto.SimpleMessage;
 import org.hyperledger.fabric.sdk.BlockEvent;
 import org.hyperledger.fabric.sdk.ChaincodeEvent;
+import org.hyperledger.fabric.sdk.NetworkConfig;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 public class EventTrackerIntegrationTest extends BaseIntegrationTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(EventTrackerIntegrationTest.class);
 
-    CompletableFuture<String> eventStatus = new CompletableFuture<>();
+    EventTracker eventTracker = new OrderingEventTracker(new Persister() {
+        @Override
+        public long getStartBlock(String channelName) {
+            return 0;
+        }
+
+        @Override
+        public void setStartBlock(String channelName, long startBlock) {
+
+        }
+    });
+
 
     @Test
-    public void testSimpleEventsWithFabricConfig() throws Exception {
-
-        EventTracker eventTracker = new OrderingEventTracker(new Persister() {
-            @Override
-            public long getStartBlock(String channelName) {
-                return 0;
-            }
-
-            @Override
-            public void setStartBlock(String channelName, long startBlock) {
-
-            }
-        });
-
-        TestEventListener testEventListener = new TestEventListener();
-        ((OrderingEventTracker) eventTracker).enableEventsDelivery();
-        ((OrderingEventTracker) eventTracker).addEventListener("mychcode", ".*", SimpleMessage.Message.class, testEventListener);
+    public void testEventTrackerWithFabricConfig() throws Exception {
 
         FabricConnector fabricConnector = new FabricConnector(
                 ConfigAdapter.getBuilder(fabricConfig)
                         .withEventtracker(eventTracker)
                         .build());
+
+        sendTransactionAndCheckEvents(fabricConnector);
+    }
+
+    @Test
+    public void testEventTrackerWithNetworkConfig() throws Exception {
+
+        NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File(NETWORK_CONFIG_FILE));
+        FabricConnector fabricConnector = new FabricConnector(
+                ConfigAdapter.getBuilder(networkConfig)
+                        .withEventtracker(eventTracker)
+                        .build());
+
+        sendTransactionAndCheckEvents(fabricConnector);
+    }
+
+
+    private void sendTransactionAndCheckEvents(FabricConnector fabricConnector) throws ExecutionException, InterruptedException, InvalidProtocolBufferException, TimeoutException {
+
+
+        CompletableFuture<String> eventStatus = new CompletableFuture<>();
+
+        TestEventListener testEventListener = new TestEventListener(eventStatus);
+        ((OrderingEventTracker) eventTracker).enableEventsDelivery();
+        ((OrderingEventTracker) eventTracker).addEventListener("mychcode", ".*", SimpleMessage.Message.class, testEventListener);
 
 
         byte[] key = "someKey".getBytes();
@@ -60,13 +85,11 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
         CompletableFuture<byte[]> queryFuture = fabricConnector.query(
                 "get", "mychcode", "mychannel", key);
 
-
         SimpleMessage.Message receivedSimpleMessage = SimpleMessage.Message.parseFrom(queryFuture.get());
         String receivedValue = receivedSimpleMessage.getPayload();
 
         Assert.assertEquals(value, receivedValue);
         LOG.info("Finished SanityCheck");
-
 
         Assert.assertEquals(eventStatus.get(1L, TimeUnit.SECONDS), "NEW STATE");
 
@@ -74,6 +97,8 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
 
 
     public class TestEventListener implements OrderingEventTracker.EventListener<SimpleMessage.Message> {
+
+        CompletableFuture<String> eventStatus;
 
         @Override
         public CompletableFuture<Boolean> filter(ChaincodeEvent chaincodeEvent) {
@@ -84,12 +109,13 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
         public CompletableFuture onEvent(ChaincodeEvent chaincodeEvent, SimpleMessage.Message eventData) {
             LOG.info("Received event: chainCodeEvent: {}, eventData: {}", chaincodeEvent.toString(), eventData.getPayload());
 
-
             eventStatus.complete(eventData.getPayload());
 
             return CompletableFuture.completedFuture(null);
         }
 
+        public TestEventListener(CompletableFuture<String> eventStatus) {
+            this.eventStatus = eventStatus;
+        }
     }
-
 }
