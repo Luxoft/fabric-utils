@@ -1,4 +1,4 @@
-package com.luxoft.fabric.config;
+package com.luxoft.fabric.configurator;
 
 import com.luxoft.fabric.FabricConfig;
 import com.luxoft.fabric.model.ConfigData;
@@ -17,9 +17,10 @@ import static com.luxoft.fabric.FabricConfig.getOrDefault;
 /**
  * Created by ADoroganov on 11.08.2017.
  */
+// TODO: make use of UserEnrollerAndRegisterService so that logic is not duplicated between those classes
 public class UserEnroller {
 
-    private static final Logger logger = LoggerFactory.getLogger(UserEnroller.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(UserEnroller.class);
 
     public static String getKeyInPemFormat(String type, Key key) throws IOException {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -53,15 +54,15 @@ public class UserEnroller {
         String privateKeyFileName = getOrDefault(usersDetails.privateKeyFileName, "pk.pem");
         String certFileName = getOrDefault(usersDetails.certFileName, "cert.pem");
 
-        logger.info("Enrolling users at CA {}", caKey);
-        logger.info("Reading users with affiliation ({}) and storing at ({}%%username%%) with cert in ({}) and pk in ({})",
+        LOGGER.info("Enrolling users at CA {}", caKey);
+        LOGGER.info("Reading users with affiliation ({}) and storing at ({}%%username%%) with cert in ({}) and pk in ({})",
                 userAffiliation, destFilesRootPath, certFileName, privateKeyFileName);
 
         long cnt = 0;
 
         for (String userName : usersDetails.list) {
 
-            logger.info("Processing user " + userName);
+            LOGGER.info("Processing user " + userName);
             HFCAClient hfcaClient = fabricConfig.createHFCAClient(caKey, null);
             User admin = fabricConfig.enrollAdmin(hfcaClient, caKey);
             String mspId = admin.getMspId();
@@ -76,10 +77,10 @@ public class UserEnroller {
                 FileUtils.writeStringToFile(certFile, user.getEnrollment().getCert());
                 cnt++;
             } catch (Exception e) {
-                logger.error("Failed to process user {}", userName, e);
+                LOGGER.error("Failed to process user {}", userName, e);
             }
         }
-        logger.info("Finished, successfully processed user count: {}", cnt);
+        LOGGER.info("Finished, successfully processed user count: {}", cnt);
     }
 
 }

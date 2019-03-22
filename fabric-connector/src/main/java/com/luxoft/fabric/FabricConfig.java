@@ -53,6 +53,8 @@ import java.util.concurrent.TimeUnit;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
+// TODO: FabricConfig class has a lot of user enrollment and registration functionality that logically should be in separate class.
+// TODO: Consider moving it to UserEnrollAndRegisterImplBasedOnFabricConfig or to some common part for both of this classes
 public class FabricConfig {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
@@ -305,22 +307,22 @@ public class FabricConfig {
         return hfClient.newChannel(channelName, orderer, channelConfiguration, channelConfigurationSignature);
     }
 
-    public void initChannel(HFClient hfClient, String channelName, FabricConnector.Options options) throws Exception {
-        getChannel(hfClient, channelName, options);
+    public void initChannel(HFClient hfClient, String channelName, EventTracker eventTracker) throws Exception {
+        getChannel(hfClient, channelName, eventTracker);
     }
 
-    public void initChannel(HFClient hfClient, String channelName, User fabricUser, FabricConnector.Options options) throws Exception {
-        getChannel(hfClient, channelName, fabricUser, options);
+    public void initChannel(HFClient hfClient, String channelName, User fabricUser, EventTracker eventTracker) throws Exception {
+        getChannel(hfClient, channelName, fabricUser, eventTracker);
     }
 
-    public Channel getChannel(HFClient hfClient, String channelName, FabricConnector.Options options) throws Exception {
+    public Channel getChannel(HFClient hfClient, String channelName, EventTracker eventTracker) throws Exception {
         ConfigData.Channel channelParameters = requireNonNull(getChannelDetails(channelName));
         String adminKey = getOrThrow(channelParameters.admin, String.format("channel[%s].admin", channelName));
         final User fabricUser = getAdmin(adminKey);
-        return getChannel(hfClient, channelName, fabricUser, options);
+        return getChannel(hfClient, channelName, fabricUser, eventTracker);
     }
 
-    public Channel getChannel(HFClient hfClient, String channelName, User fabricUser, FabricConnector.Options options) throws Exception {
+    public Channel getChannel(HFClient hfClient, String channelName, User fabricUser, EventTracker eventTracker) throws Exception {
         ConfigData.Channel channelParameters = requireNonNull(getChannelDetails(channelName));
         requireNonNull(fabricUser);
         hfClient.setUserContext(fabricUser);
@@ -330,7 +332,6 @@ public class FabricConfig {
         final List<EventHub> eventhubList = getEventHubList(hfClient, channelParameters);
 
         Channel channel = hfClient.newChannel(channelName);
-        final EventTracker eventTracker = options != null ? options.eventTracker : null;
         final Channel.PeerOptions peerOptions = Channel.PeerOptions.createPeerOptions();
 
         if (eventTracker != null) {

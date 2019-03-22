@@ -1,8 +1,7 @@
 package com.luxoft.fabric;
 
 
-import com.luxoft.fabric.impl.FabricConnectorImplBasedOnFabricConfig;
-import com.luxoft.fabric.impl.FabricConnectorImplBasedOnNetworkConfig;
+import com.luxoft.fabric.config.ConfigAdapter;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.CryptoException;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
@@ -20,7 +19,14 @@ import static org.hyperledger.fabric.protos.peer.FabricTransaction.TxValidationC
 /**
  * Created by nvolkov on 26.07.17.
  */
-public abstract class  FabricConnector {
+public class FabricConnector {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(FabricConnector.class);
+
+
+    private final ConfigAdapter configAdapter;
+    private HFClient hfClient;
+    private int defaultMaxReties = 3;
 
     public static HFClient createHFClient() throws CryptoException, InvalidArgumentException {
         CryptoSuite cryptoSuite = FabricConfig.getCryptoSuite();
@@ -29,51 +35,30 @@ public abstract class  FabricConnector {
         return hfClient;
     }
 
-    public static class Options {
-        EventTracker eventTracker;
 
-        public EventTracker getEventTracker() {
-            return eventTracker;
-        }
-
-        public Options setEventTracker(EventTracker eventTracker) {
-            this.eventTracker = eventTracker;
-            return this;
-        }
-    }
-
-    private final Logger logger = LoggerFactory.getLogger(this.getClass());
-
-    protected HFClient hfClient;
-
-
-    private String defaultChannelName;
-    private int defaultMaxRetries = 3;
-
-
-    public void initConnector(User user, String defaultChannelName, Boolean initChannels, Options options) throws Exception {
-        this.defaultChannelName = defaultChannelName;
+    private void initConnector() throws Exception {
         hfClient = createHFClient();
 
-        initUserContext(user);
+        initUserContext();
 
-        if (initChannels)
-            initChannels(options);
-
+        if (configAdapter.isInitChannels())
+            configAdapter.initChannels(hfClient);
     }
 
-
-    protected abstract void initUserContext(User user) throws Exception;
-
-
-    public abstract void initChannels(Options options) throws Exception;
+    private void initUserContext() throws Exception {
+        User user = configAdapter.getUser();
+        if (user != null)
+            hfClient.setUserContext(user);
+        else if (hfClient.getUserContext() == null)
+            hfClient.setUserContext(configAdapter.getDefaultUserContext());
+    }
 
     public int getDefaultMaxRetries() {
-        return defaultMaxRetries;
+        return defaultMaxReties;
     }
 
     public void setDefaultMaxRetries(int defaultMaxRetries) {
-        this.defaultMaxRetries = defaultMaxRetries;
+        this.defaultMaxReties = defaultMaxRetries;
     }
 
     public HFClient getHfClient() {
@@ -86,7 +71,7 @@ public abstract class  FabricConnector {
 
     @SuppressWarnings("unused")
     public Channel getDefaultChannel() {
-        return getChannel(defaultChannelName);
+        return getChannel(configAdapter.getDefaultChannelName());
     }
 
     public void setUserContext(User user) throws Exception {
@@ -105,7 +90,7 @@ public abstract class  FabricConnector {
     }
 
     public CompletableFuture<Collection<ProposalResponse>> sendProposal(TransactionProposalRequest transactionProposalRequest, boolean returnOnlySuccessful) {
-        return sendProposal(transactionProposalRequest, defaultChannelName, returnOnlySuccessful);
+        return sendProposal(transactionProposalRequest, configAdapter.getDefaultChannelName(), returnOnlySuccessful);
     }
 
     public CompletableFuture<Collection<ProposalResponse>> sendProposal(TransactionProposalRequest transactionProposalRequest, String channelName, boolean returnOnlySuccessful) {
@@ -120,10 +105,10 @@ public abstract class  FabricConnector {
                 if (returnOnlySuccessful) {
                     for (ProposalResponse response : proposalResponses) {
                         if (response.getStatus() == ProposalResponse.Status.SUCCESS) {
-                            logger.info("Successful transaction proposal response Txid: {} from peer {}", response.getTransactionID(), response.getPeer().getName());
+                            LOGGER.info("Successful transaction proposal response Txid: {} from peer {}", response.getTransactionID(), response.getPeer().getName());
                             successful.add(response);
                         } else
-                            logger.warn("Unsuccessful transaction proposal response Txid: {} from peer {}, reason: {}", response.getTransactionID(), response.getPeer().getName(), response.getMessage());
+                            LOGGER.warn("Unsuccessful transaction proposal response Txid: {} from peer {}, reason: {}", response.getTransactionID(), response.getPeer().getName(), response.getMessage());
                     }
 
                     // Check that all the proposals are consistent with each other. We should have only one set
@@ -148,7 +133,7 @@ public abstract class  FabricConnector {
 
     @SuppressWarnings("unused")
     public CompletableFuture<BlockEvent.TransactionEvent> sendTransaction(TransactionProposalRequest transactionProposalRequest) {
-        return sendTransaction(transactionProposalRequest, defaultChannelName);
+        return sendTransaction(transactionProposalRequest, configAdapter.getDefaultChannelName());
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> sendTransaction(TransactionProposalRequest transactionProposalRequest, String channelName) {
@@ -160,7 +145,7 @@ public abstract class  FabricConnector {
                 if (channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
                 future = channel.sendTransaction(proposalResponses);
             } catch (Exception e) {
-                logger.error("Failed to send transaction to channel", e);
+                LOGGER.error("Failed to send transaction to channel", e);
             }
 
             return future;
@@ -178,7 +163,7 @@ public abstract class  FabricConnector {
     }
 
     public CompletableFuture<byte[]> sendQueryRequest(QueryByChaincodeRequest request) {
-        return sendQueryRequest(request, defaultChannelName);
+        return sendQueryRequest(request, configAdapter.getDefaultChannelName());
     }
 
     public CompletableFuture<byte[]> sendQueryRequest(QueryByChaincodeRequest request, String channelName) {
@@ -209,7 +194,7 @@ public abstract class  FabricConnector {
 
     @SuppressWarnings("unused")
     public CompletableFuture<byte[]> query(String function, String chaincode, byte[]... message) {
-        return query(function, chaincode, defaultChannelName, message);
+        return query(function, chaincode, configAdapter.getDefaultChannelName(), message);
     }
 
     public CompletableFuture<byte[]> query(String function, String chaincode, String channelName, byte[]... message) {
@@ -217,15 +202,15 @@ public abstract class  FabricConnector {
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, byte[]... message) {
-        return invoke(function, chaincode, defaultChannelName, defaultMaxRetries, message);
+        return invoke(function, chaincode, configAdapter.getDefaultChannelName(), defaultMaxReties, message);
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, byte[]... message) {
-        return invoke(function, chaincode, channelName, defaultMaxRetries, message);
+        return invoke(function, chaincode, channelName, defaultMaxReties, message);
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, int maxRetries, byte[]... message) {
-        return invoke(function, chaincode, defaultChannelName, maxRetries, message);
+        return invoke(function, chaincode, configAdapter.getDefaultChannelName(), maxRetries, message);
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, int maxRetries, byte[]... message) {
@@ -242,7 +227,7 @@ public abstract class  FabricConnector {
                             switch (validationCode) {
                                 case MVCC_READ_CONFLICT_VALUE:
                                 case PHANTOM_READ_CONFLICT_VALUE:
-                                    logger.error("", t);
+                                    LOGGER.error("", t);
                                     // if ReadSet-related error we recreate transaction
                                     return sendTransaction(buildProposalRequest(function, chaincode, message), channelName);
                                 default:
@@ -266,51 +251,8 @@ public abstract class  FabricConnector {
         return cf;
     }
 
-    public static FabricConnectorImplBasedOnFabricConfig.Builder getFabricConfigBuilder(FabricConfig fabricConfig) {
-        return new FabricConnectorImplBasedOnFabricConfig.Builder(fabricConfig);
+    public FabricConnector(ConfigAdapter configAdapter) throws Exception {
+        this.configAdapter = configAdapter;
+        initConnector();
     }
-
-    public static FabricConnectorImplBasedOnNetworkConfig.Builder getNetworkConfigBuilder(NetworkConfig networkConfig) {
-        return new FabricConnectorImplBasedOnNetworkConfig.Builder(networkConfig);
-    }
-
-    @SuppressWarnings("unused")
-    public abstract User enrollUser(String caKey, String userName, String userSecret) throws Exception;
-
-    @SuppressWarnings("unused")
-    public abstract String registerUser(String caKey, String userName, String userAffiliation) throws Exception;
-
-
-    public abstract static class Builder {
-
-        protected Boolean initChannels = true;
-        protected User user;
-        protected String defaultChannelName;
-        protected Options options;
-
-        public Builder withInitChannels(Boolean initChannels) {
-            this.initChannels = initChannels;
-            return this;
-        }
-
-        public Builder withUser(User user) {
-            this.user = user;
-            return this;
-        }
-
-        public Builder withDefaultChannelName(String defaultChannelName) {
-            this.defaultChannelName = defaultChannelName;
-            return this;
-        }
-
-        public Builder withOptions(Options options) {
-            this.options = options;
-            return this;
-        }
-
-        public abstract FabricConnector build() throws Exception;
-
-
-    }
-
 }
