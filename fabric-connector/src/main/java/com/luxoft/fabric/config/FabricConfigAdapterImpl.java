@@ -1,6 +1,6 @@
 package com.luxoft.fabric.config;
 
-import com.luxoft.fabric.EventTracker;
+import com.luxoft.fabric.events.EventTracker;
 import com.luxoft.fabric.FabricConfig;
 import org.hyperledger.fabric.sdk.HFClient;
 import org.hyperledger.fabric.sdk.User;
@@ -40,7 +40,7 @@ public class FabricConfigAdapterImpl extends AbstractConfigAdapter {
             this.fabricConfig = fabricConfig;
         }
 
-        public FabricConfigAdapterImpl build() throws Exception {
+        public FabricConfigAdapterImpl build() {
             return new FabricConfigAdapterImpl(user, defaultChannelName, fabricConfig, initChannels, eventTracker);
         }
 

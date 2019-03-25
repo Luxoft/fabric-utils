@@ -20,6 +20,7 @@
 package com.luxoft.fabric;
 
 import com.fasterxml.jackson.databind.*;
+import com.luxoft.fabric.events.EventTracker;
 import com.luxoft.fabric.model.ConfigData;
 import com.luxoft.fabric.model.FileReference;
 import com.luxoft.fabric.model.jackson.ConfigModule;

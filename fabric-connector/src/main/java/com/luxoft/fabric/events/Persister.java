@@ -1,4 +1,4 @@
-package com.luxoft.fabric;
+package com.luxoft.fabric.events;
 
 public interface Persister {
     /**

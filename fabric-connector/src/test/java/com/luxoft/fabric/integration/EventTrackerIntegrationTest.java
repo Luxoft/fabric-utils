@@ -1,11 +1,9 @@
 package com.luxoft.fabric.integration;
 
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.luxoft.fabric.EventTracker;
-import com.luxoft.fabric.FabricConnector;
-import com.luxoft.fabric.OrderingEventTracker;
-import com.luxoft.fabric.Persister;
+import com.luxoft.fabric.*;
 import com.luxoft.fabric.config.ConfigAdapter;
+import com.luxoft.fabric.events.*;
 import com.luxoft.fabric.integration.proto.SimpleMessage;
 import org.hyperledger.fabric.sdk.BlockEvent;
 import org.hyperledger.fabric.sdk.ChaincodeEvent;
@@ -26,7 +24,7 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
 
     private static final Logger LOG = LoggerFactory.getLogger(EventTrackerIntegrationTest.class);
 
-    EventTracker eventTracker = new OrderingEventTracker(new Persister() {
+    private OrderingEventTracker eventTracker = new OrderingEventTracker(new Persister() {
         @Override
         public long getStartBlock(String channelName) {
             return 0;
@@ -68,9 +66,11 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
 
         CompletableFuture<String> eventStatus = new CompletableFuture<>();
 
+        PayloadDecoder payloadDecoder = new ProtobufMessagePayloadDecoder(SimpleMessage.Message.class);
+
         TestEventListener testEventListener = new TestEventListener(eventStatus);
-        ((OrderingEventTracker) eventTracker).enableEventsDelivery();
-        ((OrderingEventTracker) eventTracker).addEventListener("mychcode", ".*", SimpleMessage.Message.class, testEventListener);
+        eventTracker.enableEventsDelivery();
+        eventTracker.addEventListener("mychcode", ".*", payloadDecoder, testEventListener);
 
 
         byte[] key = "someKey".getBytes();
@@ -91,7 +91,7 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
         Assert.assertEquals(value, receivedValue);
         LOG.info("Finished SanityCheck");
 
-        Assert.assertEquals(eventStatus.get(1L, TimeUnit.SECONDS), "NEW STATE");
+        Assert.assertEquals("NEW STATE", eventStatus.get(1L, TimeUnit.SECONDS));
 
     }
 
@@ -114,7 +114,7 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
             return CompletableFuture.completedFuture(null);
         }
 
-        public TestEventListener(CompletableFuture<String> eventStatus) {
+        TestEventListener(CompletableFuture<String> eventStatus) {
             this.eventStatus = eventStatus;
         }
     }

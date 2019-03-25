@@ -1,11 +1,14 @@
 package com.luxoft.fabric.config;
 
-import com.luxoft.fabric.EventTracker;
+import com.luxoft.fabric.events.EventTracker;
 import org.hyperledger.fabric.sdk.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class NetworkConfigAdapterImpl extends AbstractConfigAdapter {
 
     private NetworkConfig networkConfig;
+    private static final Logger LOG = LoggerFactory.getLogger(NetworkConfigAdapterImpl.class);
 
 
     private NetworkConfigAdapterImpl(User user, String defaultChannelName, NetworkConfig networkConfig, boolean initChannels, EventTracker eventTracker) {
@@ -20,18 +23,23 @@ public class NetworkConfigAdapterImpl extends AbstractConfigAdapter {
 
     }
 
-    /*TODO: add some warning to the method that it does not support:
-     *   - EventTracker.getStartBlock(Channel channel)
-     *   - Eventtracker.useFilteredBlocks(Channel channel)
-     *  due to limitations of NetworkConfig     *
-     */
     @Override
     public void initChannels(HFClient hfClient) throws Exception {
 
         for (String channelName : networkConfig.getChannelNames()) {
             Channel channel = hfClient.loadChannelFromConfig(channelName, networkConfig);
-            if (eventTracker != null)
+            if (eventTracker != null) {
+
+                /* The method does not support following functionality
+                 *   - EventTracker.getStartBlock(Channel channel)
+                 *   - Eventtracker.useFilteredBlocks(Channel channel)
+                 *  due to limitations of  NetworkConfig. It allows to set those parameters only inside of PeerOptions class,
+                 *  but there is no methods in NetworkConfig class which we could use to set those options. If this functionality is needed use FabricConfigAdapterImpl
+                 *  See https://jira.hyperledger.org/browse/FABJ-430. Once it is resolved, we can rewrite this part accordingly.
+                 */
+                LOG.warn("Using events with NetworkConfig. EventTracker.getStartBlock & Eventtracker.useFilteredBlocks are not supported. See FABJ-430");
                 eventTracker.configureChannel(channel);
+            }
 
             channel.initialize();
 

@@ -1,4 +1,4 @@
-package com.luxoft.fabric.ordering;
+package com.luxoft.fabric.events.ordering;
 
 import java.util.concurrent.Callable;
 
