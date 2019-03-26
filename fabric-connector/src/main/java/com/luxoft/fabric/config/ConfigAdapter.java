@@ -21,19 +21,11 @@ public interface ConfigAdapter {
 
     User getUser();
 
-    boolean isInitChannels();
-
     abstract class Builder {
 
-        Boolean initChannels = true;
         User user;
         String defaultChannelName;
         EventTracker eventTracker;
-
-        public ConfigAdapter.Builder withInitChannels(Boolean initChannels) {
-            this.initChannels = initChannels;
-            return this;
-        }
 
         public ConfigAdapter.Builder withUser(User user) {
             this.user = user;

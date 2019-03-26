@@ -24,14 +24,14 @@ import org.slf4j.LoggerFactory;
  */
 public class FabricConnectorIntegrationTest extends BaseIntegrationTest {
 
-    private static final Logger LOG = LoggerFactory.getLogger(FabricConnectorIntegrationTest.class);
+    private static final Logger logger = LoggerFactory.getLogger(FabricConnectorIntegrationTest.class);
 
     /**
      * Write smth to blockchain and query it
      */
     @Test
     public void testSanityCheck() throws Exception {
-        LOG.info("Starting SanityCheck");
+        logger.info("Starting SanityCheck");
 
         FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(fabricConfig).build());
 
@@ -45,12 +45,12 @@ public class FabricConnectorIntegrationTest extends BaseIntegrationTest {
         CompletableFuture<byte[]> queryFuture = fabricConnector.query(
                 "get", "mychcode", "mychannel", key);
         Assert.assertArrayEquals(value, queryFuture.get());
-        LOG.info("Finished SanityCheck");
+        logger.info("Finished SanityCheck");
     }
 
     @Test
     public void testNetworkConfigSanityCheck() throws Exception {
-        LOG.info("Starting SanityCheck");
+        logger.info("Starting SanityCheck");
         
         NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File(NETWORK_CONFIG_FILE));
         FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(networkConfig).build());
@@ -65,12 +65,12 @@ public class FabricConnectorIntegrationTest extends BaseIntegrationTest {
         CompletableFuture<byte[]> queryFuture = fabricConnector.query(
                 "get", "mychcode", "mychannel", key);
         Assert.assertArrayEquals(value, queryFuture.get());
-        LOG.info("Finished SanityCheck");
+        logger.info("Finished SanityCheck");
     }
 
     @Test
     public void testTxRace() throws Exception {
-        LOG.info("Starting testTxRace");
+        logger.info("Starting testTxRace");
         FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(fabricConfig).build());
 
         AtomicInteger success = new AtomicInteger();
@@ -116,7 +116,7 @@ public class FabricConnectorIntegrationTest extends BaseIntegrationTest {
         // Its race so anyone can finish first
         assertTrue(finalValue.equals(value1) || finalValue.equals(value2));
         assertEquals(2, success.get());
-        LOG.info("Finished testTxRace");
+        logger.info("Finished testTxRace");
     }
 
 

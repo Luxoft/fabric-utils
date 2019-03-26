@@ -9,6 +9,7 @@ import org.hyperledger.fabric.sdk.exception.TransactionEventException;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
@@ -21,7 +22,7 @@ import static org.hyperledger.fabric.protos.peer.FabricTransaction.TxValidationC
  */
 public class FabricConnector {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(FabricConnector.class);
+    private static final Logger logger = LoggerFactory.getLogger(FabricConnector.class);
 
 
     private final ConfigAdapter configAdapter;
@@ -41,9 +42,9 @@ public class FabricConnector {
 
         initUserContext();
 
-        if (configAdapter.isInitChannels())
-            configAdapter.initChannels(hfClient);
+        configAdapter.initChannels(hfClient);
     }
+
 
     private void initUserContext() throws Exception {
         User user = configAdapter.getUser();
@@ -105,10 +106,10 @@ public class FabricConnector {
                 if (returnOnlySuccessful) {
                     for (ProposalResponse response : proposalResponses) {
                         if (response.getStatus() == ProposalResponse.Status.SUCCESS) {
-                            LOGGER.info("Successful transaction proposal response Txid: {} from peer {}", response.getTransactionID(), response.getPeer().getName());
+                            logger.info("Successful transaction proposal response Txid: {} from peer {}", response.getTransactionID(), response.getPeer().getName());
                             successful.add(response);
                         } else
-                            LOGGER.warn("Unsuccessful transaction proposal response Txid: {} from peer {}, reason: {}", response.getTransactionID(), response.getPeer().getName(), response.getMessage());
+                            logger.warn("Unsuccessful transaction proposal response Txid: {} from peer {}, reason: {}", response.getTransactionID(), response.getPeer().getName(), response.getMessage());
                     }
 
                     // Check that all the proposals are consistent with each other. We should have only one set
@@ -145,7 +146,7 @@ public class FabricConnector {
                 if (channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
                 future = channel.sendTransaction(proposalResponses);
             } catch (Exception e) {
-                LOGGER.error("Failed to send transaction to channel", e);
+                logger.error("Failed to send transaction to channel", e);
             }
 
             return future;
@@ -227,7 +228,7 @@ public class FabricConnector {
                             switch (validationCode) {
                                 case MVCC_READ_CONFLICT_VALUE:
                                 case PHANTOM_READ_CONFLICT_VALUE:
-                                    LOGGER.error("", t);
+                                    logger.error("", t);
                                     // if ReadSet-related error we recreate transaction
                                     return sendTransaction(buildProposalRequest(function, chaincode, message), channelName);
                                 default:

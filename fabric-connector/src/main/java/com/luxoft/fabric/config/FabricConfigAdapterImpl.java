@@ -10,8 +10,8 @@ public class FabricConfigAdapterImpl extends AbstractConfigAdapter {
 
     private FabricConfig fabricConfig;
 
-    private FabricConfigAdapterImpl(User user, String defaultChannelName, FabricConfig fabricConfig, boolean initChannels, EventTracker eventTracker) {
-        super(defaultChannelName, user, initChannels, eventTracker);
+    private FabricConfigAdapterImpl(User user, String defaultChannelName, FabricConfig fabricConfig, EventTracker eventTracker) {
+        super(defaultChannelName, user, eventTracker);
         this.fabricConfig = fabricConfig;
 
     }
@@ -36,12 +36,12 @@ public class FabricConfigAdapterImpl extends AbstractConfigAdapter {
 
         private FabricConfig fabricConfig;
 
-        public Builder(FabricConfig fabricConfig) {
+        Builder(FabricConfig fabricConfig) {
             this.fabricConfig = fabricConfig;
         }
 
-        public FabricConfigAdapterImpl build() throws Exception {
-            return new FabricConfigAdapterImpl(user, defaultChannelName, fabricConfig, initChannels, eventTracker);
+        public FabricConfigAdapterImpl build() {
+            return new FabricConfigAdapterImpl(user, defaultChannelName, fabricConfig, eventTracker);
         }
 
     }

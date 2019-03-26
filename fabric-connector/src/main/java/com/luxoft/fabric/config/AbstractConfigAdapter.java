@@ -8,13 +8,11 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
 
     private String defaultChannelName;
     private User user;
-    private boolean initChannels;
     EventTracker eventTracker;
 
-    AbstractConfigAdapter(String defaultChannelName, User user, boolean initChannels, EventTracker eventTracker) {
+    AbstractConfigAdapter(String defaultChannelName, User user, EventTracker eventTracker) {
         this.defaultChannelName = defaultChannelName;
         this.user = user;
-        this.initChannels = initChannels;
         this.eventTracker = eventTracker;
     }
 
@@ -26,11 +24,6 @@ public abstract class AbstractConfigAdapter implements ConfigAdapter {
     @Override
     public User getUser() {
         return user;
-    }
-
-    @Override
-    public boolean isInitChannels() {
-        return initChannels;
     }
 
 }

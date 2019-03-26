@@ -17,23 +17,23 @@ public class BaseIntegrationTest {
     static FabricConfig fabricConfig;
     static final String NETWORK_CONFIG_FILE = FabricConnectorIntegrationTest.class.getClassLoader().getResource("network-config.yaml").getFile();
 
-    private static final Logger LOG = LoggerFactory.getLogger(BaseIntegrationTest.class);
+    private static final Logger logger = LoggerFactory.getLogger(BaseIntegrationTest.class);
 
     @BeforeClass
     public static void setUp() throws Exception {
-        LOG.info("Starting preparation");
+        logger.info("Starting preparation");
         int exitCode = execInDirectory("./fabric.sh restart", "../files/artifacts/");
 
-        LOG.info("Waiting some time to give network the time to initialize");
+        logger.info("Waiting some time to give network the time to initialize");
         Thread.sleep(5000);
-        LOG.info("Restarted network");
+        logger.info("Restarted network");
         Assert.assertEquals(0, exitCode);
 
         fabricConfig = FabricConfig.getConfigFromFile("../files/fabric.yaml");
 
         // Configuring Fabric network
         NetworkManager.configNetwork(fabricConfig);
-        LOG.info("Finished preparation");
+        logger.info("Finished preparation");
     }
 
     @AfterClass
@@ -41,7 +41,13 @@ public class BaseIntegrationTest {
         execInDirectory("./fabric.sh clean", "../files/artifacts/");
     }
 
-    private static int execInDirectory(String cmd, String dir) {
+
+    /**
+     * @param cmd This function supports only cmd parameters split by spaces
+     * @param dir Directory where the method should be executed
+     * @return exitCode
+     */
+    static int execInDirectory(String cmd, String dir) {
         try {
             Process process = new ProcessBuilder()
                     .command(cmd.split(" "))
