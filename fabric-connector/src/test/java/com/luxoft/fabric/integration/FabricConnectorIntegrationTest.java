@@ -1,15 +1,13 @@
-package com.luxoft.fabric;
+package com.luxoft.fabric.integration;
 
-import com.luxoft.fabric.config.NetworkManager;
-import org.apache.commons.io.IOUtils;
+import com.luxoft.fabric.FabricConnector;
+import com.luxoft.fabric.config.*;
 import org.hyperledger.fabric.sdk.BlockEvent;
-import org.junit.AfterClass;
+import org.hyperledger.fabric.sdk.NetworkConfig;
 import org.junit.Assert;
-import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.io.File;
-import java.nio.charset.Charset;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,40 +22,18 @@ import org.slf4j.LoggerFactory;
  *
  * Sets up environment using default configuration from "files/fabric.yaml"
  */
-public class FabricConnectorIntegrationTest {
+public class FabricConnectorIntegrationTest extends BaseIntegrationTest {
 
-    private static FabricConfig fabricConfig;
-    private static final Logger LOG = LoggerFactory.getLogger(FabricConnectorIntegrationTest.class);
-
-    @BeforeClass
-    public static void setUp() throws Exception {
-        LOG.info("Starting preparation");
-        int exitCode = execInDirectory("./fabric.sh restart", "../files/artifacts/");
-
-        LOG.info("Waiting some time to give network the time to initialize");
-        Thread.sleep(5000);
-        LOG.info("Restarted network");
-        Assert.assertEquals(0, exitCode);
-
-        fabricConfig = FabricConfig.getConfigFromFile("../files/fabric.yaml");
-
-        // Configuring Fabric network
-        NetworkManager.configNetwork(fabricConfig);
-        LOG.info("Finished preparation");
-    }
-
-    @AfterClass
-    public static void tearDown() {
-        execInDirectory("./fabric.sh clean", "../files/artifacts/");
-    }
+    private static final Logger logger = LoggerFactory.getLogger(FabricConnectorIntegrationTest.class);
 
     /**
      * Write smth to blockchain and query it
      */
     @Test
     public void testSanityCheck() throws Exception {
-        LOG.info("Starting SanityCheck");
-        FabricConnector fabricConnector = new FabricConnector(fabricConfig);
+        logger.info("Starting SanityCheck");
+
+        FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(fabricConfig).build());
 
         byte[] key = "someKey".getBytes();
         byte[] value = UUID.randomUUID().toString().getBytes();
@@ -69,13 +45,33 @@ public class FabricConnectorIntegrationTest {
         CompletableFuture<byte[]> queryFuture = fabricConnector.query(
                 "get", "mychcode", "mychannel", key);
         Assert.assertArrayEquals(value, queryFuture.get());
-        LOG.info("Finished SanityCheck");
+        logger.info("Finished SanityCheck");
+    }
+
+    @Test
+    public void testNetworkConfigSanityCheck() throws Exception {
+        logger.info("Starting SanityCheck");
+        
+        NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File(NETWORK_CONFIG_FILE));
+        FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(networkConfig).build());
+
+        byte[] key = "someKey".getBytes();
+        byte[] value = UUID.randomUUID().toString().getBytes();
+
+        CompletableFuture<BlockEvent.TransactionEvent> putEventFuture = fabricConnector.invoke(
+                "put", "mychcode", "mychannel", key, value);
+        Assert.assertNotNull(putEventFuture.get());
+
+        CompletableFuture<byte[]> queryFuture = fabricConnector.query(
+                "get", "mychcode", "mychannel", key);
+        Assert.assertArrayEquals(value, queryFuture.get());
+        logger.info("Finished SanityCheck");
     }
 
     @Test
     public void testTxRace() throws Exception {
-        LOG.info("Starting testTxRace");
-        FabricConnector fabricConnector = new FabricConnector(fabricConfig);
+        logger.info("Starting testTxRace");
+        FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(fabricConfig).build());
 
         AtomicInteger success = new AtomicInteger();
 
@@ -120,24 +116,10 @@ public class FabricConnectorIntegrationTest {
         // Its race so anyone can finish first
         assertTrue(finalValue.equals(value1) || finalValue.equals(value2));
         assertEquals(2, success.get());
-        LOG.info("Finished testTxRace");
+        logger.info("Finished testTxRace");
     }
 
-    private static int execInDirectory(String cmd, String dir) {
-        try {
-            Process process = new ProcessBuilder()
-                    .command(cmd.split(" "))
-                    .directory(new File(System.getProperty("user.dir") + File.separator + dir).getCanonicalFile())
-                    .start();
 
-            int exitCode = process.waitFor();
 
-            System.out.println(IOUtils.toString(process.getInputStream(), Charset.defaultCharset()));
-            System.err.println(IOUtils.toString(process.getErrorStream(), Charset.defaultCharset()));
 
-            return exitCode;
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
 }

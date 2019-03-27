@@ -1,8 +1,9 @@
-package com.luxoft.fabric.config;
+package com.luxoft.fabric.configurator;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.luxoft.fabric.FabricConfig;
 import com.luxoft.fabric.FabricConnector;
+import com.luxoft.fabric.config.ConfigAdapter;
 import com.luxoft.fabric.model.ConfigData;
 import com.luxoft.fabric.utils.MiscUtils;
 import org.hyperledger.fabric.protos.common.Common;
@@ -40,7 +41,7 @@ public class NetworkManager {
     public boolean configNetwork(final FabricConfig fabricConfig, boolean skipUnauth, boolean waitChaincodes, int waitChaincodesTimeout) throws Exception {
         configNetwork(fabricConfig, skipUnauth);
         if (waitChaincodes)
-            return waitChaincodes(FabricConfig.createHFClient(), fabricConfig, Collections.emptySet(), waitChaincodesTimeout, skipUnauth);
+            return waitChaincodes(FabricConnector.createHFClient(), fabricConfig, Collections.emptySet(), waitChaincodesTimeout, skipUnauth);
         return true;
     }
 
@@ -57,7 +58,7 @@ public class NetworkManager {
                 String adminKey = getOrThrow(channelParameters.admin, String.format("channel[%s].admin", channelName));
                 final User fabricUser = fabricConfig.getAdmin(adminKey);
 
-                HFClient hfClient = FabricConfig.createHFClient();
+                HFClient hfClient = FabricConnector.createHFClient();
                 hfClient.setUserContext(fabricUser);
 
                 final List<Orderer> ordererList = fabricConfig.getOrdererList(hfClient, channelParameters);
@@ -329,7 +330,10 @@ public class NetworkManager {
     }
 
     protected static Channel getChannel(final FabricConfig fabricConfig, String channelName) throws Exception {
-        FabricConnector fabricConnector = new FabricConnector(fabricConfig, false, null);
+
+        FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(fabricConfig).build());
+
+
         return fabricConfig.getChannel(fabricConnector.getHfClient(), channelName, null);
     }
 

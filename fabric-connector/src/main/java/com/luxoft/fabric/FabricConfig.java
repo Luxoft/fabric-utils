@@ -25,15 +25,11 @@ import com.luxoft.fabric.model.FileReference;
 import com.luxoft.fabric.model.jackson.ConfigModule;
 import com.luxoft.fabric.utils.ConfigGenerator;
 import com.luxoft.fabric.utils.MiscUtils;
-import org.apache.commons.io.IOUtils;
-import org.bouncycastle.asn1.pkcs.PrivateKeyInfo;
-import org.bouncycastle.openssl.PEMParser;
-import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
+import com.luxoft.fabric.utils.UserEnrollmentUtils;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.*;
 import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.hyperledger.fabric_ca.sdk.HFCAClient;
-import org.hyperledger.fabric_ca.sdk.RegistrationRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +40,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.PrivateKey;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -53,6 +48,8 @@ import java.util.concurrent.TimeUnit;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
 
+// TODO: FabricConfig class has a lot of user enrollment and registration functionality that logically should be in separate class.
+// TODO: Consider moving it to UserEnrollAndRegisterImplBasedOnFabricConfig or to some common part for both of this classes
 public class FabricConfig {
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
@@ -100,13 +97,6 @@ public class FabricConfig {
             return Collections.emptyMap();
         else
             return channels;
-    }
-
-    public static HFClient createHFClient() throws CryptoException, InvalidArgumentException {
-        CryptoSuite cryptoSuite = getCryptoSuite();
-        HFClient hfClient = HFClient.createNewInstance();
-        hfClient.setCryptoSuite(cryptoSuite);
-        return hfClient;
     }
 
     public ConfigData.Channel getChannelDetails(String key) {
@@ -198,7 +188,7 @@ public class FabricConfig {
         String adminCert = getFileName(adminParameters.cert);
         String adminPrivateKey = getFileName(adminParameters.privateKey);
 
-        Enrollment enrollment = FabricConfig.createEnrollment(new FileInputStream(adminPrivateKey), new FileInputStream(adminCert));
+        Enrollment enrollment = UserEnrollmentUtils.createEnrollment(new FileInputStream(adminPrivateKey), new FileInputStream(adminCert));
         return new FabricUser(adminName, null, null, enrollment, adminMspID);
     }
 
@@ -224,7 +214,7 @@ public class FabricConfig {
     }
 
     public static User getFabricUser(String name, String pemPrivateKey, String cert, String mspId) throws IOException {
-        final Enrollment enrollment = createEnrollment(pemPrivateKey, cert);
+        final Enrollment enrollment = UserEnrollmentUtils.createEnrollment(pemPrivateKey, cert);
         return new FabricUser(name, null, null, enrollment, mspId);
     }
 
@@ -312,22 +302,22 @@ public class FabricConfig {
         return hfClient.newChannel(channelName, orderer, channelConfiguration, channelConfigurationSignature);
     }
 
-    public void initChannel(HFClient hfClient, String channelName, FabricConnector.Options options) throws Exception {
-        getChannel(hfClient, channelName, options);
+    public void initChannel(HFClient hfClient, String channelName, EventTracker eventTracker) throws Exception {
+        getChannel(hfClient, channelName, eventTracker);
     }
 
-    public void initChannel(HFClient hfClient, String channelName, User fabricUser, FabricConnector.Options options) throws Exception {
-        getChannel(hfClient, channelName, fabricUser, options);
+    public void initChannel(HFClient hfClient, String channelName, User fabricUser, EventTracker eventTracker) throws Exception {
+        getChannel(hfClient, channelName, fabricUser, eventTracker);
     }
 
-    public Channel getChannel(HFClient hfClient, String channelName, FabricConnector.Options options) throws Exception {
+    public Channel getChannel(HFClient hfClient, String channelName, EventTracker eventTracker) throws Exception {
         ConfigData.Channel channelParameters = requireNonNull(getChannelDetails(channelName));
         String adminKey = getOrThrow(channelParameters.admin, String.format("channel[%s].admin", channelName));
         final User fabricUser = getAdmin(adminKey);
-        return getChannel(hfClient, channelName, fabricUser, options);
+        return getChannel(hfClient, channelName, fabricUser, eventTracker);
     }
 
-    public Channel getChannel(HFClient hfClient, String channelName, User fabricUser, FabricConnector.Options options) throws Exception {
+    public Channel getChannel(HFClient hfClient, String channelName, User fabricUser, EventTracker eventTracker) throws Exception {
         ConfigData.Channel channelParameters = requireNonNull(getChannelDetails(channelName));
         requireNonNull(fabricUser);
         hfClient.setUserContext(fabricUser);
@@ -337,7 +327,6 @@ public class FabricConfig {
         final List<EventHub> eventhubList = getEventHubList(hfClient, channelParameters);
 
         Channel channel = hfClient.newChannel(channelName);
-        final EventTracker eventTracker = options != null ? options.eventTracker : null;
         final Channel.PeerOptions peerOptions = Channel.PeerOptions.createPeerOptions();
 
         if (eventTracker != null) {
@@ -581,31 +570,11 @@ public class FabricConfig {
         }
     }
 
-    private static PrivateKey getPrivateKeyFromString(String data) throws IOException {
-        final PEMParser pemParser = new PEMParser(new StringReader(data));
-        PrivateKeyInfo pemPair = (PrivateKeyInfo) pemParser.readObject();
-        PrivateKey privateKey = new JcaPEMKeyConverter().getPrivateKey(pemPair);
-        return privateKey;
-    }
 
-    private static PrivateKey getPrivateKeyFromBytes(byte[] data) throws IOException {
-        return getPrivateKeyFromString(new String(data));
-    }
 
-    public static Enrollment createEnrollment(PrivateKey privateKey, String pemCertificate) {
-        return new FabricUserEnrollment(privateKey, pemCertificate);
-    }
 
-    public static Enrollment createEnrollment(String pemPrivateKey, String pemCertificate) throws IOException {
-        PrivateKey privateKey = getPrivateKeyFromString(pemPrivateKey);
-        return new FabricUserEnrollment(privateKey, pemCertificate);
-    }
 
-    public static Enrollment createEnrollment(InputStream privateKeyFile, InputStream certFile) throws IOException {
-        PrivateKey privateKey = getPrivateKeyFromBytes(IOUtils.toByteArray(privateKeyFile));
 
-        return new FabricUserEnrollment(privateKey, IOUtils.toString(certFile));
-    }
 
     public HFCAClient createHFCAClient(String caKey) throws MalformedURLException, InvalidArgumentException {
         ConfigData.CA caParameters = getCADetails(caKey);
@@ -638,29 +607,6 @@ public class FabricConfig {
         Enrollment adminEnrollment = hfcaClient.enroll(caAdminLogin, caAdminSecret);
         User adminUser = new FabricUser(caAdminLogin, null, null, adminEnrollment, caMspID);
         return adminUser;
-    }
-
-    public String registerUser(String caKey, String userName, String userAffiliation) throws Exception {
-        HFCAClient hfcaClient = createHFCAClient(caKey, null);
-        User admin = enrollAdmin(hfcaClient, caKey);
-        return registerUser(hfcaClient, admin, userName, userAffiliation);
-    }
-
-    public static String registerUser(HFCAClient hfcaClient, User admin, String userName, String userAffiliation) throws Exception {
-        RegistrationRequest registrationRequest = new RegistrationRequest(userName, userAffiliation);
-        return hfcaClient.register(registrationRequest, admin);
-    }
-
-    public User enrollUser(String caKey, String userName, String userSecret) throws Exception {
-        ConfigData.CA caParameters = getCADetails(caKey);
-        String caMspID = getOrThrow(caParameters.mspID, String.format("ca[%s].mspID", caKey));
-        HFCAClient hfcaClient = createHFCAClient(caKey, null);
-        return enrollUser(hfcaClient, userName, userSecret, caMspID);
-    }
-
-    public static User enrollUser(HFCAClient hfcaClient, String userName, String userSecret, String mspID) throws Exception {
-        Enrollment adminEnrollment = hfcaClient.enroll(userName, userSecret);
-        return new FabricUser(userName, null, null, adminEnrollment, mspID);
     }
 
     public static FabricConfig getConfigFromFile(String configFile) {

@@ -1,7 +1,8 @@
-package com.luxoft.fabric.config;
+package com.luxoft.fabric.configurator;
 
 import com.luxoft.fabric.FabricConfig;
 import com.luxoft.fabric.model.ConfigData;
+import com.luxoft.fabric.utils.UserEnrollmentUtils;
 import org.apache.commons.io.FileUtils;
 import org.bouncycastle.util.io.pem.PemObject;
 import org.bouncycastle.util.io.pem.PemWriter;
@@ -17,6 +18,7 @@ import static com.luxoft.fabric.FabricConfig.getOrDefault;
 /**
  * Created by ADoroganov on 11.08.2017.
  */
+// TODO: make use of UserEnrollerAndRegisterService so that logic is not duplicated between those classes
 public class UserEnroller {
 
     private static final Logger logger = LoggerFactory.getLogger(UserEnroller.class);
@@ -49,7 +51,7 @@ public class UserEnroller {
             throw new RuntimeException("users.userAffiliation should be provided");
         }
 
-        String destFilesRootPath = getOrDefault(usersDetails.destFilesPath, "users/");
+        String destFilesRootPath = getOrDefault(usersDetails.destFilesPath, UserEnrollmentUtils.ENROLLMENT_DIRECTORY);
         String privateKeyFileName = getOrDefault(usersDetails.privateKeyFileName, "pk.pem");
         String certFileName = getOrDefault(usersDetails.certFileName, "cert.pem");
 
@@ -66,8 +68,8 @@ public class UserEnroller {
             User admin = fabricConfig.enrollAdmin(hfcaClient, caKey);
             String mspId = admin.getMspId();
             try {
-                String secret = fabricConfig.registerUser(hfcaClient, admin, userName, userAffiliation);
-                User user = fabricConfig.enrollUser(hfcaClient, userName, secret, mspId);
+                String secret = UserEnrollmentUtils.registerUser(hfcaClient, admin, userName, userAffiliation);
+                User user = UserEnrollmentUtils.enrollUser(hfcaClient, userName, secret, mspId);
                 File userDir = new File(destFilesRootPath + userName);
                 userDir.mkdirs();
                 File privateKeyFile = new File(userDir, privateKeyFileName);
