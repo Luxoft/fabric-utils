@@ -29,7 +29,7 @@ import java.security.PrivateKey;
 
 public class UserEnrollmentUtils {
 
-    private static final String ENROLLMENT_DIRECTORY = "enrollments";
+    public static final String ENROLLMENT_DIRECTORY = "enrollments";
     private static final String USER_KEY_FILE_NAME = "key";
     private static final String USER_CERT_FILE_NAME = "cert";
 
@@ -42,7 +42,7 @@ public class UserEnrollmentUtils {
         return new FabricUserEnrollment(privateKey, IOUtils.toString(certFile));
     }
 
-    private static PrivateKey getPrivateKeyFromString(String data) throws IOException {
+    public static PrivateKey getPrivateKeyFromString(String data) throws IOException {
         final PEMParser pemParser = new PEMParser(new StringReader(data));
 
         Object pemObject = pemParser.readObject();
@@ -61,7 +61,7 @@ public class UserEnrollmentUtils {
         return new JcaPEMKeyConverter().getPrivateKey(privateKeyInfo);
     }
 
-    private static PrivateKey getPrivateKeyFromBytes(byte[] data) throws IOException {
+    public static PrivateKey getPrivateKeyFromBytes(byte[] data) throws IOException {
         return getPrivateKeyFromString(new String(data));
     }
 
