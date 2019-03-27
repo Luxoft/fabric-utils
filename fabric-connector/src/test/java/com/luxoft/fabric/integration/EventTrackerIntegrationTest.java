@@ -22,7 +22,7 @@ import java.util.concurrent.TimeoutException;
 
 public class EventTrackerIntegrationTest extends BaseIntegrationTest {
 
-    private static final Logger LOG = LoggerFactory.getLogger(EventTrackerIntegrationTest.class);
+    private static final Logger logger = LoggerFactory.getLogger(EventTrackerIntegrationTest.class);
 
     private OrderingEventTracker eventTracker = new OrderingEventTracker(new Persister() {
         @Override
@@ -89,7 +89,7 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
         String receivedValue = receivedSimpleMessage.getPayload();
 
         Assert.assertEquals(value, receivedValue);
-        LOG.info("Finished SanityCheck");
+        logger.info("Finished SanityCheck");
 
         Assert.assertEquals("NEW STATE", eventStatus.get(1L, TimeUnit.SECONDS));
 
@@ -107,7 +107,7 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
 
         @Override
         public CompletableFuture onEvent(ChaincodeEvent chaincodeEvent, SimpleMessage.Message eventData) {
-            LOG.info("Received event: chainCodeEvent: {}, eventData: {}", chaincodeEvent.toString(), eventData.getPayload());
+            logger.info("Received event: chainCodeEvent: {}, eventData: {}", chaincodeEvent.toString(), eventData.getPayload());
 
             eventStatus.complete(eventData.getPayload());
 

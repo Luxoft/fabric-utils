@@ -8,7 +8,7 @@ import org.slf4j.LoggerFactory;
 public class NetworkConfigAdapterImpl extends AbstractConfigAdapter {
 
     private NetworkConfig networkConfig;
-    private static final Logger LOG = LoggerFactory.getLogger(NetworkConfigAdapterImpl.class);
+    private static final Logger logger = LoggerFactory.getLogger(NetworkConfigAdapterImpl.class);
 
 
     private NetworkConfigAdapterImpl(User user, String defaultChannelName, NetworkConfig networkConfig, EventTracker eventTracker) {
@@ -37,7 +37,7 @@ public class NetworkConfigAdapterImpl extends AbstractConfigAdapter {
                  *  but there is no methods in NetworkConfig class which we could use to set those options. If this functionality is needed use FabricConfigAdapterImpl
                  *  See https://jira.hyperledger.org/browse/FABJ-430. Once it is resolved, we can rewrite this part accordingly.
                  */
-                LOG.warn("Using events with NetworkConfig. EventTracker.getStartBlock & Eventtracker.useFilteredBlocks are not supported. See FABJ-430");
+                logger.warn("Using events with NetworkConfig. EventTracker.getStartBlock & Eventtracker.useFilteredBlocks are not supported. See FABJ-430");
                 eventTracker.configureChannel(channel);
             }
 
