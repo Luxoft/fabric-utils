@@ -13,7 +13,7 @@ public class FabricUserEnrollment implements Enrollment, Serializable {
     private final PrivateKey privateKey;
 
 
-    FabricUserEnrollment(PrivateKey privateKey, String certificate) {
+    public FabricUserEnrollment(PrivateKey privateKey, String certificate) {
         this.certificate = certificate;
         this.privateKey = privateKey;
     }

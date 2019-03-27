@@ -11,8 +11,8 @@ public class NetworkConfigAdapterImpl extends AbstractConfigAdapter {
     private static final Logger LOG = LoggerFactory.getLogger(NetworkConfigAdapterImpl.class);
 
 
-    private NetworkConfigAdapterImpl(User user, String defaultChannelName, NetworkConfig networkConfig, boolean initChannels, EventTracker eventTracker) {
-        super(defaultChannelName, user, initChannels, eventTracker);
+    private NetworkConfigAdapterImpl(User user, String defaultChannelName, NetworkConfig networkConfig, EventTracker eventTracker) {
+        super(defaultChannelName, user, eventTracker);
         this.networkConfig = networkConfig;
     }
 
@@ -59,7 +59,7 @@ public class NetworkConfigAdapterImpl extends AbstractConfigAdapter {
         }
 
         public NetworkConfigAdapterImpl build() {
-            return new NetworkConfigAdapterImpl(user, defaultChannelName, networkConfig, initChannels, eventTracker);
+            return new NetworkConfigAdapterImpl(user, defaultChannelName, networkConfig, eventTracker);
         }
 
     }
