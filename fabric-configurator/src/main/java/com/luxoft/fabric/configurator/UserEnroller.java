@@ -51,7 +51,7 @@ public class UserEnroller {
             throw new RuntimeException("users.userAffiliation should be provided");
         }
 
-        String destFilesRootPath = getOrDefault(usersDetails.destFilesPath, "users/");
+        String destFilesRootPath = getOrDefault(usersDetails.destFilesPath, UserEnrollmentUtils.ENROLLMENT_DIRECTORY);
         String privateKeyFileName = getOrDefault(usersDetails.privateKeyFileName, "pk.pem");
         String certFileName = getOrDefault(usersDetails.certFileName, "cert.pem");
 

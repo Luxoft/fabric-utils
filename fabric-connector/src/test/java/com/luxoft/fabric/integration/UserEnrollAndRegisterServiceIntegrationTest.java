@@ -1,6 +1,7 @@
 package com.luxoft.fabric.integration;
 
 import com.luxoft.fabric.configurator.users.UserEnrollAndRegisterService;
+import com.luxoft.fabric.utils.UserEnrollmentUtils;
 import org.hyperledger.fabric.sdk.NetworkConfig;
 import org.hyperledger.fabric.sdk.User;
 import org.junit.Assert;
@@ -20,18 +21,15 @@ public class UserEnrollAndRegisterServiceIntegrationTest extends BaseIntegration
     @BeforeClass
     public static void cleanUp() throws IOException {
 
-        final String enrollmentsDir = "enrollments";
 
-        if (Files.exists(Paths.get(enrollmentsDir))) {
+        if (Files.exists(Paths.get(UserEnrollmentUtils.ENROLLMENT_DIRECTORY))) {
 
-            Files.walk(Paths.get(enrollmentsDir))
+            Files.walk(Paths.get(UserEnrollmentUtils.ENROLLMENT_DIRECTORY))
                     .sorted(Comparator.reverseOrder())
                     .map(Path::toFile)
                     .peek(System.out::println)
                     .forEach(File::delete);
         }
-
-
     }
 
     @Test
