@@ -15,7 +15,9 @@ import java.nio.charset.Charset;
 public class BaseIntegrationTest {
 
     static FabricConfig fabricConfig;
+    FabricConfig fabricConfigServiceDiscovery = FabricConfig.getConfigFromFile("../files/fabric-service-discovery.yaml");
     static final String NETWORK_CONFIG_FILE = FabricConnectorIntegrationTest.class.getClassLoader().getResource("network-config.yaml").getFile();
+    static final String NETWORK_CONFIG__SERVICE_DISCOVERY_FILE = FabricConnectorIntegrationTest.class.getClassLoader().getResource("network-config-service-discovery.yaml").getFile();
 
     private static final Logger logger = LoggerFactory.getLogger(BaseIntegrationTest.class);
 
@@ -41,13 +43,12 @@ public class BaseIntegrationTest {
         execInDirectory("./fabric.sh clean", "../files/artifacts/");
     }
 
-
     /**
      * @param cmd This function supports only cmd parameters split by spaces
      * @param dir Directory where the method should be executed
      * @return exitCode
      */
-    static int execInDirectory(String cmd, String dir) {
+    private static int execInDirectory(String cmd, String dir) {
         try {
             Process process = new ProcessBuilder()
                     .command(cmd.split(" "))

@@ -72,6 +72,7 @@ services:
       - CORE_PEER_ID=peer0.org1.example.com
       - CORE_PEER_LOCALMSPID=Org1MSP
       - CORE_PEER_ADDRESS=peer0.org1.example.com:7051
+      - CORE_PEER_GOSSIP_EXTERNALENDPOINT=peer0.org1.example.com:7051
     ports:
       - 7051:7051
       - 7053:7053

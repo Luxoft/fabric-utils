@@ -12,7 +12,6 @@ import org.hyperledger.fabric.sdk.User;
  */
 public interface ConfigAdapter {
 
-
     User getDefaultUserContext() throws Exception;
 
     void initChannels(HFClient hfClient) throws Exception;

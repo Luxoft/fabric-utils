@@ -45,6 +45,7 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
@@ -323,26 +324,26 @@ public class FabricConfig {
         requireNonNull(fabricUser);
         hfClient.setUserContext(fabricUser);
 
-        final List<Orderer> ordererList = getOrdererList(hfClient, channelParameters);
+        final List<Orderer> ordererList = getOrdererList(hfClient, channelName, channelParameters);
         final List<Peer> peerList = getPeerList(hfClient, channelParameters);
         final List<EventHub> eventhubList = getEventHubList(hfClient, channelParameters);
 
         Channel channel = hfClient.newChannel(channelName);
-        final Channel.PeerOptions peerOptions = Channel.PeerOptions.createPeerOptions();
+        final Channel.PeerOptions commonPeerOptions = Channel.PeerOptions.createPeerOptions();
 
         if (eventTracker != null) {
             eventTracker.configureChannel(channel);
             final long startBlock = eventTracker.getStartBlock(channel);
 
             if (startBlock > 0 && startBlock < Long.MAX_VALUE)
-                peerOptions.startEvents(startBlock);
+                commonPeerOptions.startEvents(startBlock);
             else
-                peerOptions.startEventsNewest();
+                commonPeerOptions.startEventsNewest();
 
             if (eventTracker.useFilteredBlocks(channel))
-                peerOptions.registerEventsForFilteredBlocks();
+                commonPeerOptions.registerEventsForFilteredBlocks();
             else
-                peerOptions.registerEventsForBlocks();
+                commonPeerOptions.registerEventsForBlocks();
         }
 
         for (Orderer orderer : ordererList) {
@@ -350,7 +351,7 @@ public class FabricConfig {
         }
 
         for (Peer peer : peerList) {
-            channel.addPeer(peer, peerOptions);
+            channel.addPeer(peer, getPeerOptionsWithRoles(channelName, peer.getName(), commonPeerOptions));
         }
 
         for (EventHub eventhub : eventhubList) {
@@ -365,6 +366,53 @@ public class FabricConfig {
         return channel;
     }
 
+    private Channel.PeerOptions getPeerOptionsWithRoles(String channelName, String peerName, Channel.PeerOptions commonPeerOptions) {
+
+        //Add all roles by default except ServiceDiscovery in line with NetworkConfig behaviour
+        EnumSet<Peer.PeerRole> peerRoles = EnumSet.of(Peer.PeerRole.CHAINCODE_QUERY,
+                Peer.PeerRole.ENDORSING_PEER,
+                Peer.PeerRole.LEDGER_QUERY,
+                Peer.PeerRole.EVENT_SOURCE);
+
+        Map<String, Boolean> roles = getRoot().channels.get(channelName).peers.get(peerName).roles;
+        if (roles != null) {
+            roles.forEach((key, value) -> {
+                // Remove explicitly forbidden roles
+                if (!value) {
+                    peerRoles.remove(getPeerRoleByName(key));
+                }
+                //Add ServiceDiscovery role if it is explicitly enabled
+                if (key.equals(Peer.PeerRole.SERVICE_DISCOVERY.getPropertyName()) && value) {
+                    peerRoles.add(Peer.PeerRole.SERVICE_DISCOVERY);
+                }
+            });
+        }
+
+        return commonPeerOptions.clone().setPeerRoles(peerRoles);
+    }
+
+    private Peer.PeerRole getPeerRoleByName(String peerRoleName) {
+        return Arrays.stream(Peer.PeerRole.values())
+                .filter(x -> x.getPropertyName().equals(peerRoleName))
+                .collect(Collectors.toSet()).iterator().next();
+    }
+
+    private boolean isServiceDiscoveryEnabled(String channelName) {
+
+        for (ConfigData.ChannelPeer channelPeer : getRoot().channels.get(channelName).peers.values()) {
+            Map<String, Boolean> roles = channelPeer.roles;
+            if (roles != null) {
+                for (Map.Entry<String, Boolean> roleEntry : roles.entrySet()) {
+                    if (roleEntry.getKey().equals(Peer.PeerRole.SERVICE_DISCOVERY.getPropertyName()) && roleEntry.getValue()) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
     public List<EventHub> getEventHubList(HFClient hfClient, ConfigData.Channel channelParameters) throws InvalidArgumentException {
         Set<String> eventhubs = channelParameters.eventhubs;
         List<EventHub> eventhubList = new ArrayList<>();
@@ -376,25 +424,27 @@ public class FabricConfig {
     }
 
     public List<Peer> getPeerList(HFClient hfClient, ConfigData.Channel channelParameters) throws InvalidArgumentException {
-        Set<String> peers = channelParameters.peers;
+        Map<String, ConfigData.ChannelPeer> peers = channelParameters.peers;
         if (peers == null || peers.isEmpty())
             throw new RuntimeException("Peers list can`t be empty");
         List<Peer> peerList = new ArrayList<>();
-        for (String peerKey : peers) {
+        for (String peerKey : peers.keySet()) {
             Peer peer = getNewPeer(hfClient, peerKey);
             peerList.add(peer);
         }
         return peerList;
     }
 
-    public List<Orderer> getOrdererList(HFClient hfClient, ConfigData.Channel channelParameters) throws InvalidArgumentException {
+    public List<Orderer> getOrdererList(HFClient hfClient, String channelName, ConfigData.Channel channelParameters) throws InvalidArgumentException {
         Set<String> orderers = channelParameters.orderers;
-        if (orderers == null || orderers.isEmpty())
+        if ((orderers == null || orderers.isEmpty()) && !isServiceDiscoveryEnabled(channelName))
             throw new RuntimeException("Orderers list can`t be empty");
         List<Orderer> ordererList = new ArrayList<>();
-        for (String ordererKey : orderers) {
-            Orderer orderer = getNewOrderer(hfClient, ordererKey);
-            ordererList.add(orderer);
+        if (orderers != null) {
+            for (String ordererKey : orderers) {
+                Orderer orderer = getNewOrderer(hfClient, ordererKey);
+                ordererList.add(orderer);
+            }
         }
         return ordererList;
     }
@@ -570,11 +620,6 @@ public class FabricConfig {
             }
         }
     }
-
-
-
-
-
 
 
     public HFCAClient createHFCAClient(String caKey) throws MalformedURLException, InvalidArgumentException {

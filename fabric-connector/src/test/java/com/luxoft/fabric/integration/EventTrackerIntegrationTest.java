@@ -49,6 +49,17 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
+    public void testEventTrackerWithFabricConfigAndServiceDiscovery() throws Exception {
+
+        FabricConnector fabricConnector = new FabricConnector(
+                ConfigAdapter.getBuilder(fabricConfigServiceDiscovery)
+                        .withEventtracker(eventTracker)
+                        .build());
+
+        sendTransactionAndCheckEvents(fabricConnector);
+    }
+
+    @Test
     public void testEventTrackerWithNetworkConfig() throws Exception {
 
         NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File(NETWORK_CONFIG_FILE));

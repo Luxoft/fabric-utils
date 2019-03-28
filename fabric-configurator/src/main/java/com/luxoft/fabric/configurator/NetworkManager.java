@@ -61,7 +61,7 @@ public class NetworkManager {
                 HFClient hfClient = FabricConnector.createHFClient();
                 hfClient.setUserContext(fabricUser);
 
-                final List<Orderer> ordererList = fabricConfig.getOrdererList(hfClient, channelParameters);
+                final List<Orderer> ordererList = fabricConfig.getOrdererList(hfClient, channelName, channelParameters);
                 final List<Peer> peerList = fabricConfig.getPeerList(hfClient, channelParameters);
                 final List<EventHub> eventhubList = fabricConfig.getEventHubList(hfClient, channelParameters);
 
