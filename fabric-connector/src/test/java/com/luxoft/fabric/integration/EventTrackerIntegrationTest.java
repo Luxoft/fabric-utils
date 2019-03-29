@@ -66,7 +66,7 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
 
         CompletableFuture<String> eventStatus = new CompletableFuture<>();
 
-        PayloadDecoder payloadDecoder = new ProtobufMessagePayloadDecoder(SimpleMessage.Message.class);
+        final ProtobufMessagePayloadDecoder<SimpleMessage.Message> payloadDecoder = new ProtobufMessagePayloadDecoder<>(SimpleMessage.Message.class);
 
         TestEventListener testEventListener = new TestEventListener(eventStatus);
         eventTracker.enableEventsDelivery();

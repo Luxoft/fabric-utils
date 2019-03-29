@@ -3,9 +3,9 @@ package com.luxoft.fabric.events;
 /**
  * Interface which allows decode arbitrary message types coming from chaincode.
  */
-public interface PayloadDecoder {
+public interface PayloadDecoder<T> {
 
-    Object decode(byte[] encodedPayload) throws Exception;
+    T decode(byte[] encodedPayload) throws Exception;
 
-    Class getTargetClass();
+    Class<T> getTargetClass();
 }

@@ -618,7 +618,7 @@ public class OrderingEventTracker implements EventTracker {
         return true;
     }
 
-    public <T> void addEventListener(String chaincodeName, String eventName, PayloadDecoder payloadDecoder, EventListener<T> listener) {
+    public <T> void addEventListener(String chaincodeName, String eventName, PayloadDecoder<? extends T> payloadDecoder, EventListener<T> listener) {
         final EventListenerInfo eventListenerInfo = new EventListenerInfo(
                 Pattern.compile(chaincodeName),
                 Pattern.compile(eventName),

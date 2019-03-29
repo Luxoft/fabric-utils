@@ -3,8 +3,8 @@ version rootProject.version
 
 ext.grpcVersion = '1.1.2'
 
-apply plugin: 'com.google.protobuf'
 apply plugin: 'java'
+apply plugin: 'com.google.protobuf'
 apply plugin: 'maven-publish'
 
 
@@ -90,12 +90,35 @@ protobuf {
                 go { }
             }
         }
+
+        //
+        // protobuf tasks initialized too late, so we cannot refer them from the main
+        // script. `generateProtoTasks` is to be the right place to configure
+        // protobuf's tasks.
+        //
+        // Next, Google says:
+        // "DO NOT assume the names of the tasks, as they may change."
+        // however this could be replaced by "ofSourceSet('test')" which is java only.
+        // Assume refering task by name is safe enough, and it name changes, we would get
+        // some error from Gradle here
+        //
+        generateTestProto.finalizedBy copyProtoToChainCodeDirectory
+    }
+}
+
+apply plugin: 'idea'
+
+idea {
+
+    module {
+        // Not using generatedSourceDirs because of
+        // https://discuss.gradle.org/t/support-for-intellij-2016/15294/8
+        sourceDirs += file("${protobuf.generatedFilesBaseDir}/main/java")
+        sourceDirs += file("${protobuf.generatedFilesBaseDir}/main/grpc")
     }
 }
 
 task copyProtoToChainCodeDirectory(type: Copy) {
-    from "build/generated/source/proto/test/go"
-    into "../files/chaincode/src/map"
+    from "${protobuf.generatedFilesBaseDir}/test/go"
+    into "$projectDir/../files/chaincode/src/map"
 }
-
-testClasses.finalizedBy copyProtoToChainCodeDirectory
