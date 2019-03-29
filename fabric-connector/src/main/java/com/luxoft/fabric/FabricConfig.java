@@ -478,16 +478,7 @@ public class FabricConfig {
         ChaincodeID chaincodeID = getChaincodeID(key, chaincodeParameters);
         String chaincodeVersion = chaincodeID.getVersion();
 
-        InstallProposalRequest installProposalRequest = hfClient.newInstallProposalRequest();
-        installProposalRequest.setChaincodeID(chaincodeID);
-        installProposalRequest.setChaincodeSourceLocation(new File(chaincodePathPrefix));
-        installProposalRequest.setChaincodeVersion(chaincodeVersion);
-        installProposalRequest.setChaincodeLanguage(TransactionRequest.Type.valueOf(chaincodeType));
-
-        logger.info("install chaincode proposal {}:{}", chaincodeID.getName(), chaincodeID.getVersion());
-        Collection<ProposalResponse> installProposalResponse = hfClient.sendInstallProposal(installProposalRequest, peerList);
-
-        checkProposalResponse("install chaincode", installProposalResponse);
+        installChaincode(hfClient, peerList, chaincodePathPrefix, chaincodeType, chaincodeID, chaincodeVersion);
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ChaincodeCollectionConfigurationException {
@@ -583,15 +574,7 @@ public class FabricConfig {
         ChaincodeID chaincodeID = getChaincodeID(key, chaincodeParameters);
         String chaincodeVersion = chaincodeID.getVersion();
 
-        InstallProposalRequest installProposalRequest = hfClient.newInstallProposalRequest();
-        installProposalRequest.setChaincodeID(chaincodeID);
-        installProposalRequest.setChaincodeSourceLocation(new File(chaincodePathPrefix));
-        installProposalRequest.setChaincodeVersion(chaincodeVersion);
-        installProposalRequest.setChaincodeLanguage(TransactionRequest.Type.valueOf(chaincodeType));
-        logger.info("install chaincode proposal {}:{}", chaincodeID.getName(), chaincodeID.getVersion());
-        Collection<ProposalResponse> installProposalResponse = hfClient.sendInstallProposal(installProposalRequest, peerList);
-
-        checkProposalResponse("install chaincode", installProposalResponse);
+        installChaincode(hfClient, peerList, chaincodePathPrefix, chaincodeType, chaincodeID, chaincodeVersion);
 
         UpgradeProposalRequest upgradeProposalRequest = hfClient.newUpgradeProposalRequest();
         upgradeProposalRequest.setChaincodeID(chaincodeID);
@@ -608,6 +591,18 @@ public class FabricConfig {
 
         checkProposalResponse("upgrade chaincode", upgradeProposalResponses);
         return channel.sendTransaction(upgradeProposalResponses);
+    }
+
+    private void installChaincode(HFClient hfClient, List<Peer> peerList, String chaincodePathPrefix, String chaincodeType, ChaincodeID chaincodeID, String chaincodeVersion) throws InvalidArgumentException, ProposalException {
+        InstallProposalRequest installProposalRequest = hfClient.newInstallProposalRequest();
+        installProposalRequest.setChaincodeID(chaincodeID);
+        installProposalRequest.setChaincodeSourceLocation(new File(chaincodePathPrefix));
+        installProposalRequest.setChaincodeVersion(chaincodeVersion);
+        installProposalRequest.setChaincodeLanguage(TransactionRequest.Type.valueOf(chaincodeType));
+        logger.info("install chaincode proposal {}:{}", chaincodeID.getName(), chaincodeID.getVersion());
+        Collection<ProposalResponse> installProposalResponse = hfClient.sendInstallProposal(installProposalRequest, peerList);
+
+        checkProposalResponse("install chaincode", installProposalResponse);
     }
 
 
