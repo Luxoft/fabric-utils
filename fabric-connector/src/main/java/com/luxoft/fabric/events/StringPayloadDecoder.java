@@ -6,9 +6,9 @@ import java.nio.charset.StandardCharsets;
 /**
  * Implementation of @link PayloadDecoder interface for decoding Strings from payload
  */
-public class StringPayloadDecoder implements PayloadDecoder {
+public class StringPayloadDecoder implements PayloadDecoder<String> {
 
-    private final Class targetClass = String.class;
+    private final Class<String> targetClass = String.class;
     private Charset encoding;
 
     @Override
@@ -17,7 +17,7 @@ public class StringPayloadDecoder implements PayloadDecoder {
     }
 
     @Override
-    public Class getTargetClass() {
+    public Class<String> getTargetClass() {
         return targetClass;
     }
 

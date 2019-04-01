@@ -9,33 +9,35 @@ import java.lang.reflect.Method;
 /**
  * Implementation of @link PayloadDecoder interface for decoding Protobuff encoded  messages from payload
  */
-public class ProtobufMessagePayloadDecoder implements PayloadDecoder {
+public class ProtobufMessagePayloadDecoder<T extends Message> implements PayloadDecoder<T> {
 
-    private final Class targetClass;
+    private final Class<T> targetClass;
 
-    public ProtobufMessagePayloadDecoder(Class targetClass) {
+    public ProtobufMessagePayloadDecoder(Class<T> targetClass) {
         this.targetClass = targetClass;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public Message decode(byte[] encodedPayload) throws InvalidProtocolBufferException, ReflectiveOperationException {
+    public T decode(byte[] encodedPayload) throws InvalidProtocolBufferException, ReflectiveOperationException {
 
         final Method newBuilder = targetClass.getMethod("newBuilder");
         final Message.Builder builder = (Message.Builder) newBuilder.invoke(null);
-        final Message message;
+        final T message;
+
 
         if (Empty.class.isAssignableFrom(targetClass))
-            message = Empty.getDefaultInstance();
+            message = (T)Empty.getDefaultInstance();
         else if (Void.class.isAssignableFrom(targetClass))
             message = null;
         else
-            message = builder.mergeFrom(encodedPayload).build();
+            message = (T)builder.mergeFrom(encodedPayload).build();
 
         return message;
     }
 
     @Override
-    public Class getTargetClass() {
+    public Class<T> getTargetClass() {
         return targetClass;
     }
 }
