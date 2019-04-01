@@ -1,7 +1,7 @@
 group 'com.luxoft'
 version rootProject.version
 
-ext.grpcVersion = '1.1.2'
+ext.grpcVersion = '1.17.1'
 
 apply plugin: 'java'
 apply plugin: 'com.google.protobuf'
