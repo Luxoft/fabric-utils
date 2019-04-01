@@ -70,3 +70,4 @@ gradle-app.setting
 network
 chaincodes
 crypto-config
+files/chaincode/src/map/SimpleMessage.pb.go

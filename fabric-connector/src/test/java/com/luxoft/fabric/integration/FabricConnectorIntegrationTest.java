@@ -2,8 +2,10 @@ package com.luxoft.fabric.integration;
 
 import com.luxoft.fabric.FabricConnector;
 import com.luxoft.fabric.config.*;
+import com.luxoft.fabric.FabricConnector;
 import org.hyperledger.fabric.sdk.BlockEvent;
 import org.hyperledger.fabric.sdk.NetworkConfig;
+import org.hyperledger.fabric.sdk.User;
 import org.junit.Assert;
 import org.junit.Test;
 

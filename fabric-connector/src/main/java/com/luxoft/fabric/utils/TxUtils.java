@@ -1,7 +1,7 @@
 package com.luxoft.fabric.utils;
 
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.luxoft.fabric.ordering.FabricQueryException;
+import com.luxoft.fabric.events.ordering.FabricQueryException;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;

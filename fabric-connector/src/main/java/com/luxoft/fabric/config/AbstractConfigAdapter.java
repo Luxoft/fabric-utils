@@ -1,7 +1,7 @@
 package com.luxoft.fabric.config;
 
 
-import com.luxoft.fabric.EventTracker;
+import com.luxoft.fabric.events.EventTracker;
 import org.hyperledger.fabric.sdk.User;
 
 public abstract class AbstractConfigAdapter implements ConfigAdapter {

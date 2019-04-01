@@ -1,8 +1,7 @@
-package com.luxoft.fabric;
+package com.luxoft.fabric.events;
 
 import com.google.protobuf.Empty;
-import com.google.protobuf.Message;
-import com.luxoft.fabric.ordering.FabricQueryException;
+import com.luxoft.fabric.events.ordering.FabricQueryException;
 import com.luxoft.fabric.utils.TxUtils;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
@@ -11,7 +10,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.ref.WeakReference;
-import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.regex.Pattern;
@@ -67,16 +65,16 @@ public class OrderingEventTracker implements EventTracker {
     private static class EventListenerInfo {
         final Pattern chaincodePattern;
         final Pattern eventNamePattern;
-        final Class paramClass;
+        final PayloadDecoder payloadDecoder;
         final EventListener listener;
 
         EventListenerInfo(Pattern chaincodePattern,
                           Pattern eventNamePattern,
-                          Class paramClass,
+                          PayloadDecoder payloadDecoder,
                           EventListener listener) {
             this.chaincodePattern = chaincodePattern;
             this.eventNamePattern = eventNamePattern;
-            this.paramClass = paramClass;
+            this.payloadDecoder = payloadDecoder;
             this.listener = listener;
         }
     }
@@ -322,8 +320,8 @@ public class OrderingEventTracker implements EventTracker {
                             result = result.thenCombineAsync(filter, (subs, currRelate) -> {
                                 if (Boolean.TRUE.equals(currRelate)) {
                                     boolean needsFetching = false;
-                                    if (!Empty.class.isAssignableFrom(e.paramClass)
-                                            && e.paramClass != Void.class) {
+                                    if (!Empty.class.isAssignableFrom(e.payloadDecoder.getTargetClass())
+                                            && e.payloadDecoder.getTargetClass() != Void.class) {
                                         needsFetching = blockData.blockInfo.isFiltered();
                                     }
                                     subs.needsFetching |= needsFetching;
@@ -469,16 +467,8 @@ public class OrderingEventTracker implements EventTracker {
                     final String eventName = chaincodeEvent.getEventName();
 
                     try {
-                        final Method newBuilder = listenerInfo.paramClass.getMethod("newBuilder");
-                        final Message.Builder builder = (Message.Builder) newBuilder.invoke(null);
-                        final Message message;
 
-                        if (Empty.class.isAssignableFrom(listenerInfo.paramClass))
-                            message = Empty.getDefaultInstance();
-                        else if (Void.class.isAssignableFrom(listenerInfo.paramClass))
-                            message = null;
-                        else
-                            message = builder.mergeFrom(chaincodeEvent.getPayload()).build();
+                        Object message = listenerInfo.payloadDecoder.decode(chaincodeEvent.getPayload());
 
                         blockProcessor = blockProcessor
                                 .thenCompose((r) -> {
@@ -588,8 +578,8 @@ public class OrderingEventTracker implements EventTracker {
                     final String eventName = chaincodeEvent.getEventName();
                     if (e.chaincodePattern.matcher(chaincodeId).matches()
                             && e.eventNamePattern.matcher(eventName).matches()) {
-                        if (!Empty.class.isAssignableFrom(e.paramClass)
-                                && e.paramClass != Void.class) {
+                        if (!Empty.class.isAssignableFrom(e.payloadDecoder.getTargetClass())
+                                && e.payloadDecoder.getTargetClass() != Void.class) {
                             needFetching = isFilteredData;
                         }
                     } else {
@@ -628,11 +618,11 @@ public class OrderingEventTracker implements EventTracker {
         return true;
     }
 
-    public <T extends Message> void addEventListener(String chaincodeName, String eventName, Class<T> parameterClass, EventListener<T> listener) {
+    public <T> void addEventListener(String chaincodeName, String eventName, PayloadDecoder<? extends T> payloadDecoder, EventListener<T> listener) {
         final EventListenerInfo eventListenerInfo = new EventListenerInfo(
                 Pattern.compile(chaincodeName),
                 Pattern.compile(eventName),
-                parameterClass,
+                payloadDecoder,
                 listener);
         eventsWaiting.add(eventListenerInfo);
     }

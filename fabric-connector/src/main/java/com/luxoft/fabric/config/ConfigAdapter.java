@@ -1,6 +1,6 @@
 package com.luxoft.fabric.config;
 
-import com.luxoft.fabric.EventTracker;
+import com.luxoft.fabric.events.EventTracker;
 import com.luxoft.fabric.FabricConfig;
 import org.hyperledger.fabric.sdk.HFClient;
 import org.hyperledger.fabric.sdk.NetworkConfig;

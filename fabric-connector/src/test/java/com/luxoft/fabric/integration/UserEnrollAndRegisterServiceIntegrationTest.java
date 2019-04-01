@@ -17,6 +17,11 @@ import java.util.Comparator;
 
 public class UserEnrollAndRegisterServiceIntegrationTest extends BaseIntegrationTest {
 
+    private static final String CA_KEY = "ca.org1.example.com";
+    private static final String USER_AFFILATION = "org1";
+    private static final String ADMIN = "admin";
+    private static final String ADMIN_PASSWORD = "adminpw";
+
 
     @BeforeClass
     public static void cleanUp() throws IOException {
@@ -37,11 +42,11 @@ public class UserEnrollAndRegisterServiceIntegrationTest extends BaseIntegration
 
         UserEnrollAndRegisterService enroller = UserEnrollAndRegisterService.getInstance(fabricConfig);
 
-        User adminUser = enroller.enrollUser("ca.org1.example.com", "admin", "adminpw");
+        User adminUser = enroller.enrollUser(CA_KEY, ADMIN, ADMIN_PASSWORD);
 
         Assert.assertNotNull(adminUser);
 
-        String userSecret = enroller.registerUser("ca.org1.example.com", "testUser1", "org1");
+        String userSecret = enroller.registerUser(CA_KEY, "testUser1", USER_AFFILATION);
 
         Assert.assertNotNull(userSecret);
     }
@@ -52,11 +57,11 @@ public class UserEnrollAndRegisterServiceIntegrationTest extends BaseIntegration
         NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File(NETWORK_CONFIG_FILE));
         UserEnrollAndRegisterService enroller = UserEnrollAndRegisterService.getInstance(networkConfig);
 
-        User adminUser = enroller.enrollUser("ca.org1.example.com", "admin", "adminpw");
+        User adminUser = enroller.enrollUser(CA_KEY, ADMIN, ADMIN_PASSWORD);
 
         Assert.assertNotNull(adminUser);
 
-        String userSecret = enroller.registerUser("ca.org1.example.com", "testUser2", "org1");
+        String userSecret = enroller.registerUser(CA_KEY, "testUser2", USER_AFFILATION);
 
         Assert.assertNotNull(userSecret);
 
@@ -68,13 +73,13 @@ public class UserEnrollAndRegisterServiceIntegrationTest extends BaseIntegration
         NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File(NETWORK_CONFIG_FILE));
         UserEnrollAndRegisterService enroller = UserEnrollAndRegisterService.getInstance(networkConfig);
 
-        String userSecret1 = enroller.registerUser("ca.org1.example.com", "testUser4", "org1");
+        String userSecret1 = enroller.registerUser(CA_KEY, "testUser4", USER_AFFILATION);
 
         Assert.assertNotNull(userSecret1);
 
         UserEnrollAndRegisterService enroller2 = UserEnrollAndRegisterService.getInstance(networkConfig);
 
-        String userSecret2 = enroller2.registerUser("ca.org1.example.com", "testUser5", "org1");
+        String userSecret2 = enroller2.registerUser(CA_KEY, "testUser5", USER_AFFILATION);
 
         Assert.assertNotNull(userSecret2);
 
@@ -86,13 +91,13 @@ public class UserEnrollAndRegisterServiceIntegrationTest extends BaseIntegration
 
         UserEnrollAndRegisterService enroller = UserEnrollAndRegisterService.getInstance(fabricConfig);
 
-        String userSecret1 = enroller.registerUser("ca.org1.example.com", "testUser7", "org1");
+        String userSecret1 = enroller.registerUser(CA_KEY, "testUser7", USER_AFFILATION);
 
         Assert.assertNotNull(userSecret1);
 
         UserEnrollAndRegisterService enroller2 = UserEnrollAndRegisterService.getInstance(fabricConfig);
 
-        String userSecret2 = enroller2.registerUser("ca.org1.example.com", "testUser8", "org1");
+        String userSecret2 = enroller2.registerUser(CA_KEY, "testUser8", USER_AFFILATION);
 
         Assert.assertNotNull(userSecret2);
 

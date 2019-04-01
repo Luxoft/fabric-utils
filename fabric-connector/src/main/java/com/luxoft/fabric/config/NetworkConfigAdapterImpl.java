@@ -1,13 +1,14 @@
 package com.luxoft.fabric.config;
 
-import com.luxoft.fabric.EventTracker;
-import org.hyperledger.fabric.sdk.NetworkConfig;
-import org.hyperledger.fabric.sdk.HFClient;
-import org.hyperledger.fabric.sdk.User;
+import com.luxoft.fabric.events.EventTracker;
+import org.hyperledger.fabric.sdk.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class NetworkConfigAdapterImpl extends AbstractConfigAdapter {
 
     private NetworkConfig networkConfig;
+    private static final Logger logger = LoggerFactory.getLogger(NetworkConfigAdapterImpl.class);
 
 
     private NetworkConfigAdapterImpl(User user, String defaultChannelName, NetworkConfig networkConfig, EventTracker eventTracker) {
@@ -26,7 +27,25 @@ public class NetworkConfigAdapterImpl extends AbstractConfigAdapter {
     public void initChannels(HFClient hfClient) throws Exception {
 
         for (String channelName : networkConfig.getChannelNames()) {
-            hfClient.loadChannelFromConfig(channelName, networkConfig).initialize();
+            Channel channel = hfClient.loadChannelFromConfig(channelName, networkConfig);
+            if (eventTracker != null) {
+
+                /* The method does not support following functionality
+                 *   - EventTracker.getStartBlock(Channel channel)
+                 *   - Eventtracker.useFilteredBlocks(Channel channel)
+                 *  due to limitations of  NetworkConfig. It allows to set those parameters only inside of PeerOptions class,
+                 *  but there is no methods in NetworkConfig class which we could use to set those options. If this functionality is needed use FabricConfigAdapterImpl
+                 *  See https://jira.hyperledger.org/browse/FABJ-430. Once it is resolved, we can rewrite this part accordingly.
+                 */
+                logger.warn("Using events with NetworkConfig. EventTracker.getStartBlock & Eventtracker.useFilteredBlocks are not supported. See FABJ-430");
+                eventTracker.configureChannel(channel);
+            }
+
+            channel.initialize();
+
+            if (eventTracker != null)
+                eventTracker.connectChannel(channel);
+
         }
 
     }
