@@ -21,12 +21,6 @@ channels:
   - mychannel:
       peers:
         - peer:
-            roles:
-              serviceDiscovery: true
-#              defaults
-#              endorsingPeer: true
-#              chaincodeQuery: true
-#              ledgerQuery: true
-#              eventSource: true
+            roles: # all roles are enabled by default
 
 

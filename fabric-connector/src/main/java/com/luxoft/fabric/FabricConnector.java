@@ -230,8 +230,7 @@ public class FabricConnector {
                                 switch (validationCode) {
                                     case MVCC_READ_CONFLICT_VALUE:
                                     case PHANTOM_READ_CONFLICT_VALUE:
-                                        logger.error("", t);
-                                        // if ReadSet-related error we recreate transaction
+                                        logger.warn("ReadSet-related error so we recreate transaction ", t);
                                         return sendTransaction(buildProposalRequest(function, chaincode, message), channelName);
                                     default:
                                         // fail on other Tx errors, retries won't help here

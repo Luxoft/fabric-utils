@@ -45,7 +45,6 @@ import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.requireNonNull;
@@ -368,46 +367,42 @@ public class FabricConfig {
 
     private Channel.PeerOptions getPeerOptionsWithRoles(String channelName, String peerName, Channel.PeerOptions commonPeerOptions) {
 
-        //Add all roles by default except ServiceDiscovery in line with NetworkConfig behaviour
-        EnumSet<Peer.PeerRole> peerRoles = EnumSet.of(Peer.PeerRole.CHAINCODE_QUERY,
-                Peer.PeerRole.ENDORSING_PEER,
-                Peer.PeerRole.LEDGER_QUERY,
-                Peer.PeerRole.EVENT_SOURCE);
+        requireNonNull(getRoot().channels.get(channelName), "No channel with name " + channelName);
+        requireNonNull(getRoot().channels.get(channelName).peers.get(peerName), String.format("No peer %s in channel %s", peerName, channelName));
 
+        //Add all roles by default except ServiceDiscovery in line with NetworkConfig behaviour
+        EnumSet<Peer.PeerRole> peerRoles = EnumSet.allOf(Peer.PeerRole.class);
+        // Remove explicitly forbidden roles
         Map<String, Boolean> roles = getRoot().channels.get(channelName).peers.get(peerName).roles;
         if (roles != null) {
-            roles.forEach((key, value) -> {
-                // Remove explicitly forbidden roles
-                if (!value) {
-                    peerRoles.remove(getPeerRoleByName(key));
-                }
-                //Add ServiceDiscovery role if it is explicitly enabled
-                if (key.equals(Peer.PeerRole.SERVICE_DISCOVERY.getPropertyName()) && value) {
-                    peerRoles.add(Peer.PeerRole.SERVICE_DISCOVERY);
-                }
-            });
+            roles.entrySet().stream().filter(e -> !e.getValue())
+                    .forEach(e -> peerRoles.remove(getPeerRoleByName(e.getKey())));
         }
 
         return commonPeerOptions.clone().setPeerRoles(peerRoles);
     }
 
     private Peer.PeerRole getPeerRoleByName(String peerRoleName) {
-        return Arrays.stream(Peer.PeerRole.values())
+        return Peer.PeerRole.ALL.stream()
                 .filter(x -> x.getPropertyName().equals(peerRoleName))
-                .collect(Collectors.toSet()).iterator().next();
+                .findAny().orElseThrow(() -> new IllegalArgumentException("No peer role with name: " + peerRoleName));
     }
 
     private boolean isServiceDiscoveryEnabled(String channelName) {
+        requireNonNull(getRoot().channels.get(channelName), String.format("Channel %s not found", channelName));
 
         for (ConfigData.ChannelPeer channelPeer : getRoot().channels.get(channelName).peers.values()) {
+            Boolean peerServiceDiscoveryEnabled = true; // By default
             Map<String, Boolean> roles = channelPeer.roles;
             if (roles != null) {
                 for (Map.Entry<String, Boolean> roleEntry : roles.entrySet()) {
-                    if (roleEntry.getKey().equals(Peer.PeerRole.SERVICE_DISCOVERY.getPropertyName()) && roleEntry.getValue()) {
-                        return true;
+                    if (roleEntry.getKey().equals(Peer.PeerRole.SERVICE_DISCOVERY.getPropertyName()) && !roleEntry.getValue()) {
+                        peerServiceDiscoveryEnabled = false; // Override if explicitly forbidden
                     }
                 }
             }
+            if (peerServiceDiscoveryEnabled)
+                return true;
         }
 
         return false;
@@ -717,6 +712,7 @@ public class FabricConfig {
 
     /**
      * Convert JSON node to Java properties.
+     *
      * @param propertiesNode node with properties
      * @return properties with key as JSON key and value as JSON value
      */
@@ -748,6 +744,7 @@ public class FabricConfig {
 
     /**
      * Convert Map<String,String> object to Java properties.
+     *
      * @param stringMap node with properties
      * @return properties with keys and values from stringMap
      */
