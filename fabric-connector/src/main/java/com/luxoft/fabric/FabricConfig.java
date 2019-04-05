@@ -367,13 +367,13 @@ public class FabricConfig {
 
     private Channel.PeerOptions getPeerOptionsWithRoles(String channelName, String peerName, Channel.PeerOptions commonPeerOptions) {
 
-        requireNonNull(getRoot().channels.get(channelName), "No channel with name " + channelName);
-        requireNonNull(getRoot().channels.get(channelName).peers.get(peerName), String.format("No peer %s in channel %s", peerName, channelName));
+        ConfigData.Channel channel = requireNonNull(getRoot().channels.get(channelName), "No channel with name " + channelName);
+        ConfigData.ChannelPeer channelPeer = requireNonNull(channel.peers.get(peerName), String.format("No peer %s in channel %s", peerName, channelName));
 
         //Add all roles by default except ServiceDiscovery in line with NetworkConfig behaviour
         EnumSet<Peer.PeerRole> peerRoles = EnumSet.allOf(Peer.PeerRole.class);
         // Remove explicitly forbidden roles
-        Map<String, Boolean> roles = getRoot().channels.get(channelName).peers.get(peerName).roles;
+        Map<String, Boolean> roles = channelPeer.roles;
         if (roles != null) {
             roles.entrySet().stream().filter(e -> !e.getValue())
                     .forEach(e -> peerRoles.remove(getPeerRoleByName(e.getKey())));
@@ -389,9 +389,9 @@ public class FabricConfig {
     }
 
     private boolean isServiceDiscoveryEnabled(String channelName) {
-        requireNonNull(getRoot().channels.get(channelName), String.format("Channel %s not found", channelName));
+        ConfigData.Channel channel = requireNonNull(getRoot().channels.get(channelName), String.format("Channel %s not found", channelName));
 
-        for (ConfigData.ChannelPeer channelPeer : getRoot().channels.get(channelName).peers.values()) {
+        for (ConfigData.ChannelPeer channelPeer : channel.peers.values()) {
             Boolean peerServiceDiscoveryEnabled = true; // By default
             Map<String, Boolean> roles = channelPeer.roles;
             if (roles != null) {
