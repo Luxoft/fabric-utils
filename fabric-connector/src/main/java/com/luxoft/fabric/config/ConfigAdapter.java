@@ -36,7 +36,7 @@ public interface ConfigAdapter {
             return this;
         }
 
-        public ConfigAdapter.Builder withEventtracker(EventTracker eventTracker) {
+        public ConfigAdapter.Builder withEventTracker(EventTracker eventTracker) {
             this.eventTracker = eventTracker;
             return this;
         }
