@@ -125,14 +125,28 @@ public class ConfigData {
 
     }
 
+    public static class ChannelPeer {
+
+        public final Map<String, Boolean> roles;
+
+        // Jackson specific constructor
+        private ChannelPeer() {
+            this(null);
+        }
+
+        public ChannelPeer(Map<String, Boolean> roles) {
+            this.roles = roles;
+        }
+    }
+
     public static class Channel {
         public final String admin;
 
         @JsonDeserialize(as = LinkedHashSet.class)
         public final Set<String> orderers;
 
-        @JsonDeserialize(as = LinkedHashSet.class)
-        public final Set<String> peers;
+        @JsonDeserialize(using = ConfigModule.ChannelPeerListDeserializer.class, as = LinkedHashMap.class)
+        public final Map<String, ChannelPeer> peers;
 
         @JsonDeserialize(as = LinkedHashSet.class)
         public final Set<String> eventhubs;
@@ -149,7 +163,7 @@ public class ConfigData {
 
         public Channel(String admin,
                        Collection<String> orderers,
-                       Collection<String> peers,
+                       Map<String, ChannelPeer> peers,
                        Collection<String> eventhubs,
                        FileReference txFile,
                        Collection<ChannelChaincode> chaincodes) {
@@ -157,7 +171,7 @@ public class ConfigData {
             this.txFile = txFile;
 
             this.orderers = buildSet(orderers);
-            this.peers = buildSet(peers);
+            this.peers = buildMap(peers);
             this.eventhubs = buildSet(eventhubs);
             this.chaincodes = buildList(chaincodes);
         }

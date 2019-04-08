@@ -68,6 +68,12 @@ public class ConfigModule {
         }
     }
 
+    public static class ChannelPeerListDeserializer extends StringMapDeserialzier<ConfigData.ChannelPeer> {
+        public ChannelPeerListDeserializer() {
+            super(ConfigData.ChannelPeer.class);
+        }
+    }
+
     public static class PeerListDeserializer extends StringMapDeserialzier<ConfigData.Peer> {
         public PeerListDeserializer() {
             super(ConfigData.Peer.class);

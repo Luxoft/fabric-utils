@@ -323,26 +323,26 @@ public class FabricConfig {
         requireNonNull(fabricUser);
         hfClient.setUserContext(fabricUser);
 
-        final List<Orderer> ordererList = getOrdererList(hfClient, channelParameters);
+        final List<Orderer> ordererList = getOrdererList(hfClient, channelName, channelParameters);
         final List<Peer> peerList = getPeerList(hfClient, channelParameters);
         final List<EventHub> eventhubList = getEventHubList(hfClient, channelParameters);
 
         Channel channel = hfClient.newChannel(channelName);
-        final Channel.PeerOptions peerOptions = Channel.PeerOptions.createPeerOptions();
+        final Channel.PeerOptions commonPeerOptions = Channel.PeerOptions.createPeerOptions();
 
         if (eventTracker != null) {
             eventTracker.configureChannel(channel);
             final long startBlock = eventTracker.getStartBlock(channel);
 
             if (startBlock > 0 && startBlock < Long.MAX_VALUE)
-                peerOptions.startEvents(startBlock);
+                commonPeerOptions.startEvents(startBlock);
             else
-                peerOptions.startEventsNewest();
+                commonPeerOptions.startEventsNewest();
 
             if (eventTracker.useFilteredBlocks(channel))
-                peerOptions.registerEventsForFilteredBlocks();
+                commonPeerOptions.registerEventsForFilteredBlocks();
             else
-                peerOptions.registerEventsForBlocks();
+                commonPeerOptions.registerEventsForBlocks();
         }
 
         for (Orderer orderer : ordererList) {
@@ -350,7 +350,7 @@ public class FabricConfig {
         }
 
         for (Peer peer : peerList) {
-            channel.addPeer(peer, peerOptions);
+            channel.addPeer(peer, getPeerOptionsWithRoles(channelName, peer.getName(), commonPeerOptions));
         }
 
         for (EventHub eventhub : eventhubList) {
@@ -365,6 +365,49 @@ public class FabricConfig {
         return channel;
     }
 
+    private Channel.PeerOptions getPeerOptionsWithRoles(String channelName, String peerName, Channel.PeerOptions commonPeerOptions) {
+
+        ConfigData.Channel channel = requireNonNull(getRoot().channels.get(channelName), "No channel with name " + channelName);
+        ConfigData.ChannelPeer channelPeer = requireNonNull(channel.peers.get(peerName), String.format("No peer %s in channel %s", peerName, channelName));
+
+        //Add all roles by default except ServiceDiscovery in line with NetworkConfig behaviour
+        EnumSet<Peer.PeerRole> peerRoles = EnumSet.allOf(Peer.PeerRole.class);
+        // Remove explicitly forbidden roles
+        Map<String, Boolean> roles = channelPeer.roles;
+        if (roles != null) {
+            roles.entrySet().stream().filter(e -> !e.getValue())
+                    .forEach(e -> peerRoles.remove(getPeerRoleByName(e.getKey())));
+        }
+
+        return commonPeerOptions.clone().setPeerRoles(peerRoles);
+    }
+
+    private Peer.PeerRole getPeerRoleByName(String peerRoleName) {
+        return Peer.PeerRole.ALL.stream()
+                .filter(x -> x.getPropertyName().equals(peerRoleName))
+                .findAny().orElseThrow(() -> new IllegalArgumentException("No peer role with name: " + peerRoleName));
+    }
+
+    private boolean isServiceDiscoveryEnabled(String channelName) {
+        ConfigData.Channel channel = requireNonNull(getRoot().channels.get(channelName), String.format("Channel %s not found", channelName));
+
+        for (ConfigData.ChannelPeer channelPeer : channel.peers.values()) {
+            Boolean peerServiceDiscoveryEnabled = true; // By default
+            Map<String, Boolean> roles = channelPeer.roles;
+            if (roles != null) {
+                for (Map.Entry<String, Boolean> roleEntry : roles.entrySet()) {
+                    if (roleEntry.getKey().equals(Peer.PeerRole.SERVICE_DISCOVERY.getPropertyName()) && !roleEntry.getValue()) {
+                        peerServiceDiscoveryEnabled = false; // Override if explicitly forbidden
+                    }
+                }
+            }
+            if (peerServiceDiscoveryEnabled)
+                return true;
+        }
+
+        return false;
+    }
+
     public List<EventHub> getEventHubList(HFClient hfClient, ConfigData.Channel channelParameters) throws InvalidArgumentException {
         Set<String> eventhubs = channelParameters.eventhubs;
         List<EventHub> eventhubList = new ArrayList<>();
@@ -376,25 +419,27 @@ public class FabricConfig {
     }
 
     public List<Peer> getPeerList(HFClient hfClient, ConfigData.Channel channelParameters) throws InvalidArgumentException {
-        Set<String> peers = channelParameters.peers;
+        Map<String, ConfigData.ChannelPeer> peers = channelParameters.peers;
         if (peers == null || peers.isEmpty())
             throw new RuntimeException("Peers list can`t be empty");
         List<Peer> peerList = new ArrayList<>();
-        for (String peerKey : peers) {
+        for (String peerKey : peers.keySet()) {
             Peer peer = getNewPeer(hfClient, peerKey);
             peerList.add(peer);
         }
         return peerList;
     }
 
-    public List<Orderer> getOrdererList(HFClient hfClient, ConfigData.Channel channelParameters) throws InvalidArgumentException {
+    public List<Orderer> getOrdererList(HFClient hfClient, String channelName, ConfigData.Channel channelParameters) throws InvalidArgumentException {
         Set<String> orderers = channelParameters.orderers;
-        if (orderers == null || orderers.isEmpty())
+        if ((orderers == null || orderers.isEmpty()) && !isServiceDiscoveryEnabled(channelName))
             throw new RuntimeException("Orderers list can`t be empty");
         List<Orderer> ordererList = new ArrayList<>();
-        for (String ordererKey : orderers) {
-            Orderer orderer = getNewOrderer(hfClient, ordererKey);
-            ordererList.add(orderer);
+        if (orderers != null) {
+            for (String ordererKey : orderers) {
+                Orderer orderer = getNewOrderer(hfClient, ordererKey);
+                ordererList.add(orderer);
+            }
         }
         return ordererList;
     }
@@ -428,16 +473,7 @@ public class FabricConfig {
         ChaincodeID chaincodeID = getChaincodeID(key, chaincodeParameters);
         String chaincodeVersion = chaincodeID.getVersion();
 
-        InstallProposalRequest installProposalRequest = hfClient.newInstallProposalRequest();
-        installProposalRequest.setChaincodeID(chaincodeID);
-        installProposalRequest.setChaincodeSourceLocation(new File(chaincodePathPrefix));
-        installProposalRequest.setChaincodeVersion(chaincodeVersion);
-        installProposalRequest.setChaincodeLanguage(TransactionRequest.Type.valueOf(chaincodeType));
-
-        logger.info("install chaincode proposal {}:{}", chaincodeID.getName(), chaincodeID.getVersion());
-        Collection<ProposalResponse> installProposalResponse = hfClient.sendInstallProposal(installProposalRequest, peerList);
-
-        checkProposalResponse("install chaincode", installProposalResponse);
+        installChaincode(hfClient, peerList, chaincodePathPrefix, chaincodeType, chaincodeID, chaincodeVersion);
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> instantiateChaincode(HFClient hfClient, Channel channel, String key) throws InvalidArgumentException, ProposalException, IOException, ChaincodeEndorsementPolicyParseException, ChaincodeCollectionConfigurationException {
@@ -533,15 +569,7 @@ public class FabricConfig {
         ChaincodeID chaincodeID = getChaincodeID(key, chaincodeParameters);
         String chaincodeVersion = chaincodeID.getVersion();
 
-        InstallProposalRequest installProposalRequest = hfClient.newInstallProposalRequest();
-        installProposalRequest.setChaincodeID(chaincodeID);
-        installProposalRequest.setChaincodeSourceLocation(new File(chaincodePathPrefix));
-        installProposalRequest.setChaincodeVersion(chaincodeVersion);
-        installProposalRequest.setChaincodeLanguage(TransactionRequest.Type.valueOf(chaincodeType));
-        logger.info("install chaincode proposal {}:{}", chaincodeID.getName(), chaincodeID.getVersion());
-        Collection<ProposalResponse> installProposalResponse = hfClient.sendInstallProposal(installProposalRequest, peerList);
-
-        checkProposalResponse("install chaincode", installProposalResponse);
+        installChaincode(hfClient, peerList, chaincodePathPrefix, chaincodeType, chaincodeID, chaincodeVersion);
 
         UpgradeProposalRequest upgradeProposalRequest = hfClient.newUpgradeProposalRequest();
         upgradeProposalRequest.setChaincodeID(chaincodeID);
@@ -560,6 +588,18 @@ public class FabricConfig {
         return channel.sendTransaction(upgradeProposalResponses);
     }
 
+    private void installChaincode(HFClient hfClient, List<Peer> peerList, String chaincodePathPrefix, String chaincodeType, ChaincodeID chaincodeID, String chaincodeVersion) throws InvalidArgumentException, ProposalException {
+        InstallProposalRequest installProposalRequest = hfClient.newInstallProposalRequest();
+        installProposalRequest.setChaincodeID(chaincodeID);
+        installProposalRequest.setChaincodeSourceLocation(new File(chaincodePathPrefix));
+        installProposalRequest.setChaincodeVersion(chaincodeVersion);
+        installProposalRequest.setChaincodeLanguage(TransactionRequest.Type.valueOf(chaincodeType));
+        logger.info("install chaincode proposal {}:{}", chaincodeID.getName(), chaincodeID.getVersion());
+        Collection<ProposalResponse> installProposalResponse = hfClient.sendInstallProposal(installProposalRequest, peerList);
+
+        checkProposalResponse("install chaincode", installProposalResponse);
+    }
+
 
     private void checkProposalResponse(String proposalType, Collection<ProposalResponse> proposalResponses) {
         for (ProposalResponse response : proposalResponses) {
@@ -570,11 +610,6 @@ public class FabricConfig {
             }
         }
     }
-
-
-
-
-
 
 
     public HFCAClient createHFCAClient(String caKey) throws MalformedURLException, InvalidArgumentException {
@@ -677,6 +712,7 @@ public class FabricConfig {
 
     /**
      * Convert JSON node to Java properties.
+     *
      * @param propertiesNode node with properties
      * @return properties with key as JSON key and value as JSON value
      */
@@ -708,6 +744,7 @@ public class FabricConfig {
 
     /**
      * Convert Map<String,String> object to Java properties.
+     *
      * @param stringMap node with properties
      * @return properties with keys and values from stringMap
      */

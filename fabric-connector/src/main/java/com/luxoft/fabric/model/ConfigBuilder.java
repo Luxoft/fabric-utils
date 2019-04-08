@@ -169,7 +169,7 @@ public class ConfigBuilder {
     public static class Channel {
         private String admin;
         private Collection<String> orderers;
-        private Collection<String> peers;
+        private Map<String, ConfigData.ChannelPeer> peers;
         private Collection<String> eventhubs;
         private FileReference txFile;
         private Collection<ConfigData.ChannelChaincode> chaincodes;
@@ -184,7 +184,7 @@ public class ConfigBuilder {
             return this;
         }
 
-        public Channel withPeers(Collection<String> peers) {
+        public Channel withPeers(Map<String, ConfigData.ChannelPeer> peers) {
             this.peers = peers;
             return this;
         }

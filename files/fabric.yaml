@@ -42,7 +42,9 @@ channels:
         orderers:
             - orderer
         peers:
-            - peer
+            - peer:
+                  roles:
+                      serviceDiscovery: false
         txFile: artifacts/channel/mychannel.tx
         chaincodes:
             - superchaincode

@@ -12,7 +12,6 @@ import org.hyperledger.fabric.sdk.User;
  */
 public interface ConfigAdapter {
 
-
     User getDefaultUserContext() throws Exception;
 
     void initChannels(HFClient hfClient) throws Exception;
@@ -37,7 +36,7 @@ public interface ConfigAdapter {
             return this;
         }
 
-        public ConfigAdapter.Builder withEventtracker(EventTracker eventTracker) {
+        public ConfigAdapter.Builder withEventTracker(EventTracker eventTracker) {
             this.eventTracker = eventTracker;
             return this;
         }

@@ -224,16 +224,20 @@ public class FabricConnector {
             f = f.thenApply(CompletableFuture::completedFuture)
                     .exceptionally(t -> {
                         try {
-                            int validationCode = ((TransactionEventException) t.getCause()).getTransactionEvent().getValidationCode();
-                            switch (validationCode) {
-                                case MVCC_READ_CONFLICT_VALUE:
-                                case PHANTOM_READ_CONFLICT_VALUE:
-                                    logger.error("", t);
-                                    // if ReadSet-related error we recreate transaction
-                                    return sendTransaction(buildProposalRequest(function, chaincode, message), channelName);
-                                default:
-                                    // fail on other Tx errors, retries won't help here
-                                    return failedFuture(t);
+                            Throwable cause = t.getCause();
+                            if (cause instanceof TransactionEventException) {
+                                int validationCode = ((TransactionEventException) cause).getTransactionEvent().getValidationCode();
+                                switch (validationCode) {
+                                    case MVCC_READ_CONFLICT_VALUE:
+                                    case PHANTOM_READ_CONFLICT_VALUE:
+                                        logger.warn("ReadSet-related error so we recreate transaction ", t);
+                                        return sendTransaction(buildProposalRequest(function, chaincode, message), channelName);
+                                    default:
+                                        // fail on other Tx errors, retries won't help here
+                                        return failedFuture(t);
+                                }
+                            } else {
+                                return failedFuture(cause);
                             }
                         } catch (Throwable e) {
                             // In case of any unexpected errors

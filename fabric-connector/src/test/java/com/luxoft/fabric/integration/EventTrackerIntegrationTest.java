@@ -42,7 +42,18 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
 
         FabricConnector fabricConnector = new FabricConnector(
                 ConfigAdapter.getBuilder(fabricConfig)
-                        .withEventtracker(eventTracker)
+                        .withEventTracker(eventTracker)
+                        .build());
+
+        sendTransactionAndCheckEvents(fabricConnector);
+    }
+
+    @Test
+    public void testEventTrackerWithFabricConfigAndServiceDiscovery() throws Exception {
+
+        FabricConnector fabricConnector = new FabricConnector(
+                ConfigAdapter.getBuilder(fabricConfigServiceDiscovery)
+                        .withEventTracker(eventTracker)
                         .build());
 
         sendTransactionAndCheckEvents(fabricConnector);
@@ -54,7 +65,7 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
         NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File(NETWORK_CONFIG_FILE));
         FabricConnector fabricConnector = new FabricConnector(
                 ConfigAdapter.getBuilder(networkConfig)
-                        .withEventtracker(eventTracker)
+                        .withEventTracker(eventTracker)
                         .build());
 
         sendTransactionAndCheckEvents(fabricConnector);

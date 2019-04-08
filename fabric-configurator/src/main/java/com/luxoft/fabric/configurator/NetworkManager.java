@@ -61,7 +61,7 @@ public class NetworkManager {
                 HFClient hfClient = FabricConnector.createHFClient();
                 hfClient.setUserContext(fabricUser);
 
-                final List<Orderer> ordererList = fabricConfig.getOrdererList(hfClient, channelParameters);
+                final List<Orderer> ordererList = fabricConfig.getOrdererList(hfClient, channelName, channelParameters);
                 final List<Peer> peerList = fabricConfig.getPeerList(hfClient, channelParameters);
                 final List<EventHub> eventhubList = fabricConfig.getEventHubList(hfClient, channelParameters);
 
@@ -185,6 +185,10 @@ public class NetworkManager {
 
             wc.peers.addAll(channel.getPeers());
 
+            //TODO: The behaviour is questionable.
+            // In case we pass some non-existing chaincode, wait will be finished succesfully.
+            // I would expect it to throw an error
+            // As a fix I suggest specifying channel name explicitly with this command, and thus we can throw the error if chaincode is not present on this channel
             final List<ConfigData.ChannelChaincode> channelChaincodes = getOrDefault(channelValue.chaincodes, Collections.emptyList());
             for (ConfigData.ChannelChaincode channelChaincode : channelChaincodes) {
                 final String chaincodeName = getOrThrow(channelChaincode.name, String.format("channel[%s].chaincode[?].name", channelName));
