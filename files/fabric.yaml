@@ -42,7 +42,9 @@ channels:
         orderers:
             - orderer
         peers:
-            - peer
+            - peer:
+                  roles:
+                      serviceDiscovery: false
         txFile: artifacts/channel/mychannel.tx
         chaincodes:
             - superchaincode
@@ -51,10 +53,11 @@ cas:
     - ca.org1.example.com:
         url: https://localhost:7054
         pemFile: artifacts/crypto-config/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem
-        allowAllHostNames: true
         adminLogin: admin
         adminSecret: adminpw
         mspID: Org1MSP
+        properties:
+            allowAllHostNames: true
 
 users:
     destFilesPath: users/

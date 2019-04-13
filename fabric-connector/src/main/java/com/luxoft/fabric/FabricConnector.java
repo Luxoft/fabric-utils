@@ -1,8 +1,12 @@
 package com.luxoft.fabric;
 
-import com.fasterxml.jackson.databind.JsonNode;
+
+import com.luxoft.fabric.config.ConfigAdapter;
 import org.hyperledger.fabric.sdk.*;
+import org.hyperledger.fabric.sdk.exception.CryptoException;
+import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.TransactionEventException;
+import org.hyperledger.fabric.sdk.security.CryptoSuite;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,133 +22,63 @@ import static org.hyperledger.fabric.protos.peer.FabricTransaction.TxValidationC
  */
 public class FabricConnector {
 
-    public static class Options {
-        EventTracker eventTracker;
+    private static final Logger logger = LoggerFactory.getLogger(FabricConnector.class);
 
-        public EventTracker getEventTracker() {
-            return eventTracker;
-        }
 
-        public Options setEventTracker(EventTracker eventTracker) {
-            this.eventTracker = eventTracker;
-            return this;
-        }
+    private final ConfigAdapter configAdapter;
+    private HFClient hfClient;
+    private int defaultMaxReties = 3;
+
+    public static HFClient createHFClient() throws CryptoException, InvalidArgumentException {
+        CryptoSuite cryptoSuite = FabricConfig.getCryptoSuite();
+        HFClient hfClient = HFClient.createNewInstance();
+        hfClient.setCryptoSuite(cryptoSuite);
+        return hfClient;
     }
 
-    private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    protected HFClient hfClient;
-    protected FabricConfig fabricConfig;
+    private void initConnector() throws Exception {
+        hfClient = createHFClient();
 
-    private String defaultChannelName;
-    private int defaultMaxRetries = 3;
+        initUserContext();
 
-    public FabricConnector(FabricConfig fabricConfig, Boolean initChannels) throws Exception {
-        this(null, null, fabricConfig, initChannels, null);
+        configAdapter.initChannels(hfClient);
     }
 
-    public FabricConnector(FabricConfig fabricConfig, Boolean initChannels, Options options) throws Exception {
-        this(null, null, fabricConfig, initChannels, options);
-    }
 
-    public FabricConnector(FabricConfig fabricConfig) throws Exception {
-        this(null, null, fabricConfig, null);
-    }
-
-    public FabricConnector(FabricConfig fabricConfig, Options options) throws Exception {
-        this(null, null, fabricConfig, options);
-    }
-
-    public FabricConnector(User user, FabricConfig fabricConfig, Options options) throws Exception {
-        this(user, null, fabricConfig, options);
-    }
-
-    public FabricConnector(String defaultChannelName, FabricConfig fabricConfig, Options options) throws Exception {
-        this(null, defaultChannelName, fabricConfig, options);
-    }
-
-    public FabricConnector(User user, String defaultChannelname, FabricConfig fabricConfig) throws Exception{
-        this(user, defaultChannelname, fabricConfig, true, null);
-    }
-
-    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig, Boolean initChannels, Options options) throws Exception {
-        this.fabricConfig = fabricConfig;
-        this.defaultChannelName = defaultChannelName;
-
-        hfClient = FabricConfig.createHFClient();
-
+    private void initUserContext() throws Exception {
+        User user = configAdapter.getUser();
         if (user != null)
             hfClient.setUserContext(user);
         else if (hfClient.getUserContext() == null)
-            hfClient.setUserContext(fabricConfig.getAdmin(fabricConfig.getAdminsKeys().get(0)));
-
-        if (initChannels) initChannels(options);
-    }
-
-    public FabricConnector(User user, String defaultChannelName, FabricConfig fabricConfig, FabricConnector.Options options) throws Exception {
-        this(user, defaultChannelName, fabricConfig, true, options);
-    }
-
-    public void initChannels() throws Exception {
-        initChannels(null);
-    }
-
-    public void initChannels(Options options) throws Exception {
-        for (Iterator<JsonNode> it = fabricConfig.getChannels(); it.hasNext(); ) {
-            String channel = it.next().fields().next().getKey();
-            fabricConfig.initChannel(hfClient, channel, hfClient.getUserContext(), options);
-        }
+            hfClient.setUserContext(configAdapter.getDefaultUserContext());
     }
 
     public int getDefaultMaxRetries() {
-        return defaultMaxRetries;
+        return defaultMaxReties;
     }
 
     public void setDefaultMaxRetries(int defaultMaxRetries) {
-        this.defaultMaxRetries = defaultMaxRetries;
+        this.defaultMaxReties = defaultMaxRetries;
     }
 
     public HFClient getHfClient() {
         return hfClient;
     }
 
-    public FabricConfig getFabricConfig() {
-        return fabricConfig;
-    }
-
-    public Channel getChannel(String channelName)
-    {
+    public Channel getChannel(String channelName) {
         return getHfClient().getChannel(channelName);
     }
 
+    @SuppressWarnings("unused")
     public Channel getDefaultChannel() {
-        return getChannel(defaultChannelName);
+        return getChannel(configAdapter.getDefaultChannelName());
     }
 
     public void setUserContext(User user) throws Exception {
         hfClient.setUserContext(user);
     }
 
-    public void deployChaincode(String chaincodeName) throws Exception {
-        deployChaincode(chaincodeName, defaultChannelName);
-    }
-
-    public void upgradeChaincode(String chaincodeName) throws Exception {
-        upgradeChaincode(chaincodeName, defaultChannelName);
-    }
-
-    public void deployChaincode(String chaincodeName, String channelName) throws Exception {
-        Channel channel = hfClient.getChannel(channelName);
-        if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
-        fabricConfig.installChaincode(hfClient, new ArrayList<>(channel.getPeers()), chaincodeName);
-        fabricConfig.instantiateChaincode(hfClient, channel, chaincodeName);
-    }
-
-    public void upgradeChaincode(String chaincodeName, String channelName) throws Exception {
-        Channel channel = hfClient.getChannel(channelName);
-        if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
-        fabricConfig.upgradeChaincode(hfClient, channel, new ArrayList<>(channel.getPeers()), chaincodeName);
-    }
 
     public TransactionProposalRequest buildProposalRequest(String function, String chaincode, byte[][] message) {
 
@@ -157,7 +91,7 @@ public class FabricConnector {
     }
 
     public CompletableFuture<Collection<ProposalResponse>> sendProposal(TransactionProposalRequest transactionProposalRequest, boolean returnOnlySuccessful) {
-        return sendProposal(transactionProposalRequest, defaultChannelName, returnOnlySuccessful);
+        return sendProposal(transactionProposalRequest, configAdapter.getDefaultChannelName(), returnOnlySuccessful);
     }
 
     public CompletableFuture<Collection<ProposalResponse>> sendProposal(TransactionProposalRequest transactionProposalRequest, String channelName, boolean returnOnlySuccessful) {
@@ -165,7 +99,7 @@ public class FabricConnector {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 Channel channel = hfClient.getChannel(channelName);
-                if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
+                if (channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
                 Collection<ProposalResponse> proposalResponses = channel.sendTransactionProposal(transactionProposalRequest, channel.getPeers());
                 Collection<ProposalResponse> successful = new LinkedList<>();
 
@@ -198,8 +132,9 @@ public class FabricConnector {
         });
     }
 
+    @SuppressWarnings("unused")
     public CompletableFuture<BlockEvent.TransactionEvent> sendTransaction(TransactionProposalRequest transactionProposalRequest) {
-        return sendTransaction(transactionProposalRequest, defaultChannelName);
+        return sendTransaction(transactionProposalRequest, configAdapter.getDefaultChannelName());
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> sendTransaction(TransactionProposalRequest transactionProposalRequest, String channelName) {
@@ -208,7 +143,7 @@ public class FabricConnector {
             CompletableFuture<BlockEvent.TransactionEvent> future = null;
             try {
                 Channel channel = hfClient.getChannel(channelName);
-                if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
+                if (channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
                 future = channel.sendTransaction(proposalResponses);
             } catch (Exception e) {
                 logger.error("Failed to send transaction to channel", e);
@@ -229,7 +164,7 @@ public class FabricConnector {
     }
 
     public CompletableFuture<byte[]> sendQueryRequest(QueryByChaincodeRequest request) {
-        return sendQueryRequest(request, defaultChannelName);
+        return sendQueryRequest(request, configAdapter.getDefaultChannelName());
     }
 
     public CompletableFuture<byte[]> sendQueryRequest(QueryByChaincodeRequest request, String channelName) {
@@ -237,7 +172,7 @@ public class FabricConnector {
             ProposalResponse lastFailProposal = null;
             try {
                 Channel channel = hfClient.getChannel(channelName);
-                if(channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
+                if (channel == null) throw new IllegalAccessException("Channel not found for name: " + channelName);
                 final Collection<ProposalResponse> proposalResponses = channel.queryByChaincode(request);
                 for (ProposalResponse proposalResponse : proposalResponses) {
                     if (!proposalResponse.isVerified() || proposalResponse.getStatus() != ProposalResponse.Status.SUCCESS) {
@@ -258,8 +193,9 @@ public class FabricConnector {
         });
     }
 
+    @SuppressWarnings("unused")
     public CompletableFuture<byte[]> query(String function, String chaincode, byte[]... message) {
-        return query(function, chaincode, defaultChannelName, message);
+        return query(function, chaincode, configAdapter.getDefaultChannelName(), message);
     }
 
     public CompletableFuture<byte[]> query(String function, String chaincode, String channelName, byte[]... message) {
@@ -267,15 +203,15 @@ public class FabricConnector {
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, byte[]... message) {
-        return invoke(function, chaincode, defaultChannelName, defaultMaxRetries, message);
+        return invoke(function, chaincode, configAdapter.getDefaultChannelName(), defaultMaxReties, message);
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, byte[]... message) {
-        return invoke(function, chaincode, channelName, defaultMaxRetries, message);
+        return invoke(function, chaincode, channelName, defaultMaxReties, message);
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, int maxRetries, byte[]... message) {
-        return invoke(function, chaincode, defaultChannelName, maxRetries, message);
+        return invoke(function, chaincode, configAdapter.getDefaultChannelName(), maxRetries, message);
     }
 
     public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, int maxRetries, byte[]... message) {
@@ -284,20 +220,24 @@ public class FabricConnector {
         // Here we handle retry 'maxRetries' times
         // Basically we just chain N(='maxRetries') dummy futures that push successful one further
         // In case of exception it checks transaction error code and either push forward the exception or recreates transaction on retry-able errors
-        for(int i = 0; i < maxRetries; i++) {
+        for (int i = 0; i < maxRetries; i++) {
             f = f.thenApply(CompletableFuture::completedFuture)
                     .exceptionally(t -> {
                         try {
-                            int validationCode = ((TransactionEventException) t.getCause()).getTransactionEvent().getValidationCode();
-                            switch(validationCode) {
-                                case MVCC_READ_CONFLICT_VALUE:
-                                case PHANTOM_READ_CONFLICT_VALUE:
-                                    logger.error("", t);
-                                    // if ReadSet-related error we recreate transaction
-                                    return sendTransaction(buildProposalRequest(function, chaincode, message), channelName);
-                                default:
-                                    // fail on other Tx errors, retries won't help here
-                                    return failedFuture(t);
+                            Throwable cause = t.getCause();
+                            if (cause instanceof TransactionEventException) {
+                                int validationCode = ((TransactionEventException) cause).getTransactionEvent().getValidationCode();
+                                switch (validationCode) {
+                                    case MVCC_READ_CONFLICT_VALUE:
+                                    case PHANTOM_READ_CONFLICT_VALUE:
+                                        logger.warn("ReadSet-related error so we recreate transaction ", t);
+                                        return sendTransaction(buildProposalRequest(function, chaincode, message), channelName);
+                                    default:
+                                        // fail on other Tx errors, retries won't help here
+                                        return failedFuture(t);
+                                }
+                            } else {
+                                return failedFuture(cause);
                             }
                         } catch (Throwable e) {
                             // In case of any unexpected errors
@@ -314,5 +254,10 @@ public class FabricConnector {
         final CompletableFuture<T> cf = new CompletableFuture<>();
         cf.completeExceptionally(t);
         return cf;
+    }
+
+    public FabricConnector(ConfigAdapter configAdapter) throws Exception {
+        this.configAdapter = configAdapter;
+        initConnector();
     }
 }

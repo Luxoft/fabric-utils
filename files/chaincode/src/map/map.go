@@ -17,14 +17,15 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"bytes"
-	"strconv"
-	"time"
-	"strings"
 	"net/url"
+	"strconv"
+	"strings"
+	"time"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric/core/chaincode/shim"
 	pb "github.com/hyperledger/fabric/protos/peer"
 )
@@ -44,32 +45,32 @@ type SimpleChaincode struct {
 
 // Init is a no-op
 func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
-	creator, err := stub.GetCreator();
+	creator, err := stub.GetCreator()
 
 	if err != nil {
 		return shim.Error(fmt.Sprintf("Failed to get creator. Error: %s", err))
 	}
 	creatorString := url.PathEscape(string(creator[:]))
-    fmt.Printf("Init creator: %s\n", creatorString)
+	fmt.Printf("Init creator: %s\n", creatorString)
 
-	stub.PutState(creatorString,[]byte("['read','write','admin']"));
-	state, err := stub.GetState(creatorString);
+	stub.PutState(creatorString, []byte("['read','write','admin']"))
+	state, err := stub.GetState(creatorString)
 	fmt.Printf("Check state: %s", string(state[:]))
 	return shim.Success(nil)
 }
 
-func checkPermission(stub shim.ChaincodeStubInterface, permission string) bool{
+func checkPermission(stub shim.ChaincodeStubInterface, permission string) bool {
 
-    fmt.Printf("Checking permissions\n")
-	creator, err := stub.GetCreator();
+	fmt.Printf("Checking permissions\n")
+	creator, err := stub.GetCreator()
 	if err != nil {
 		fmt.Printf("Failed to get creator. Error: %s", err)
-		return false;
+		return false
 	}
 	creatorString := url.PathEscape(string(creator[:]))
-    fmt.Printf("Creator: %s\n", creatorString)
+	fmt.Printf("Creator: %s\n", creatorString)
 
-	state, err := stub.GetState(creatorString);
+	state, err := stub.GetState(creatorString)
 	fmt.Printf("State: %s", string(state[:]))
 	return state != nil && strings.Contains(string(state[:]), permission)
 }
@@ -79,7 +80,7 @@ func checkPermission(stub shim.ChaincodeStubInterface, permission string) bool{
 // remove - takes one argument, a key, and removes if from the state
 func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 
-    fmt.Printf("Invoking\n")
+	fmt.Printf("Invoking\n")
 	function, args := stub.GetFunctionAndParameters()
 	switch function {
 	case "put":
@@ -87,7 +88,7 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 			fmt.Printf("Forbidden")
 			return shim.Error(fmt.Sprintf("Forbidden"))
 		}
-		
+
 		if len(args) < 2 {
 			return shim.Error("put operation must include two arguments, a key and value")
 		}
@@ -118,20 +119,28 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 			fmt.Printf("Error putting state with compositeKey %s", err)
 			return shim.Error(fmt.Sprintf("put operation failed. Error updating state with compositeKey: %s", err))
 		}
-		
-		
-		if err := stub.SetEvent(key, []byte("NEW STATE")); err != nil {
+
+		message := new(Message)
+		message.Payload = "NEW STATE"
+
+		messageBytes, err := proto.Marshal(message)
+
+		if err != nil {
+			return shim.Error(fmt.Sprintf("Failed to create protobuf: %s", err))
+		}
+
+		if err := stub.SetEvent(key, messageBytes); err != nil {
 			return shim.Error(fmt.Sprintf("put operation failed. Error emiting state update event with compositeKey: %s", err))
 		}
 
 		return shim.Success(nil)
 
-	case "remove":		
+	case "remove":
 		if !checkPermission(stub, "write") {
 			fmt.Printf("Forbidden")
 			return shim.Error(fmt.Sprintf("Forbidden"))
 		}
-		
+
 		if len(args) < 1 {
 			return shim.Error("remove operation must include one argument, a key")
 		}
@@ -148,12 +157,12 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 			fmt.Printf("Forbidden")
 			return shim.Error(fmt.Sprintf("Forbidden"))
 		}
-	
+
 		if len(args) < 1 {
 			return shim.Error("get operation must include one argument, a key")
 		}
 		key := args[0]
-		
+
 		value, err := stub.GetState(key)
 		if err != nil {
 			return shim.Error(fmt.Sprintf("get operation failed. Error accessing state: %s", err))
@@ -232,7 +241,7 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 			fmt.Printf("Forbidden")
 			return shim.Error(fmt.Sprintf("Forbidden"))
 		}
-		
+
 		if len(args) < 2 {
 			return shim.Error("put operation must include two arguments, a key and value")
 		}
@@ -280,7 +289,7 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 			fmt.Printf("Forbidden")
 			return shim.Error(fmt.Sprintf("Forbidden"))
 		}
-		
+
 		query := args[0]
 		keysIter, err := stub.GetQueryResult(query)
 		if err != nil {
@@ -308,7 +317,7 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 			fmt.Printf("Forbidden")
 			return shim.Error(fmt.Sprintf("Forbidden"))
 		}
-		
+
 		key := args[0]
 		keysIter, err := stub.GetHistoryForKey(key)
 		if err != nil {
@@ -335,11 +344,11 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 		}
 
 		return shim.Success(jsonKeys)
-		
+
 	case "permissionRequest":
-	
+
 		key := "permissionRequest"
-		
+
 		value, err := stub.GetState(key)
 		if err != nil {
 			return shim.Error(fmt.Sprintf("get permission request operation failed. Error accessing state: %s", err))
@@ -347,30 +356,30 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 		if value != nil {
 			return shim.Error(fmt.Sprintf("permission request allready pending. Error accessing state: %s", err))
 		}
-		
-		creator, err := stub.GetCreator();
+
+		creator, err := stub.GetCreator()
 		if err != nil {
 			fmt.Printf("Failed to get creator. Error: %s", err)
-			return shim.Error(fmt.Sprintf("Failed to get creator. Error: %s", err));
+			return shim.Error(fmt.Sprintf("Failed to get creator. Error: %s", err))
 		}
-		
+
 		value = creator
 
 		if err := stub.PutState(key, value); err != nil {
 			fmt.Printf("Error putting state %s", err)
 			return shim.Error(fmt.Sprintf("put operation failed. Error updating state: %s", err))
-		}		
+		}
 
 		return shim.Success(nil)
-		
+
 	case "dropLastGrantedPermission":
 		if !checkPermission(stub, "admin") {
 			fmt.Printf("Forbidden")
 			return shim.Error(fmt.Sprintf("Forbidden"))
 		}
-	
+
 		key := "lastGrantedUser"
-		
+
 		userCert, err := stub.GetState(key)
 		if err != nil {
 			return shim.Error(fmt.Sprintf("get permission request operation failed. Error accessing state: %s", err))
@@ -378,12 +387,12 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 		if userCert == nil {
 			return shim.Error(fmt.Sprintf("no rights was granted. Error accessing state: %s", err))
 		}
-		
+
 		err = stub.DelState(key)
 		if err != nil {
 			return shim.Error(fmt.Sprintf("remove last granted record failed. Error updating state: %s", err))
 		}
-		
+
 		key = string(userCert[:])
 		err = stub.DelState(key)
 		if err != nil {
@@ -391,38 +400,47 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 		}
 
 		return shim.Success(nil)
-		
+
 	case "addReadWritePermission":
 		if !checkPermission(stub, "admin") {
 			fmt.Printf("Forbidden")
 			return shim.Error(fmt.Sprintf("Forbidden"))
 		}
-		
+
 		key := "permissionRequest"
 		userCert, err := stub.GetState(key)
 		if err != nil {
 			return shim.Error(fmt.Sprintf("get permission request operation failed. Error accessing state: %s", err))
 		}
-		
+
 		key = string(userCert[:])
 		value := []byte("['read','write']")
-		
+
 		if err := stub.PutState(key, []byte(value)); err != nil {
 			fmt.Printf("Error putting state %s", err)
 			return shim.Error(fmt.Sprintf("put operation failed. Error updating state: %s", err))
-		}		
-		
-		if err := stub.SetEvent(key, []byte("ReadWritePermission")); err != nil {
+		}
+
+		message := new(Message)
+		message.Payload = "ReadWritePermission"
+
+		messageBytes, err := proto.Marshal(message)
+
+		if err != nil {
+			return shim.Error(fmt.Sprintf("Failed to create protobuf: %s", err))
+		}
+
+		if err := stub.SetEvent(key, messageBytes); err != nil {
 			return shim.Error(fmt.Sprintf("put operation failed. Error emiting state update event with compositeKey: %s", err))
 		}
-		
+
 		key = "lastGrantedUser"
-		
+
 		if err := stub.PutState(key, userCert); err != nil {
 			fmt.Printf("Error putting state %s", err)
 			return shim.Error(fmt.Sprintf("put operation failed. Error updating state: %s", err))
-		}	
-		
+		}
+
 		key = "permissionRequest"
 		err = stub.DelState(key)
 		if err != nil {
@@ -430,38 +448,47 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 		}
 
 		return shim.Success(nil)
-		
+
 	case "addReadPermission":
 		if !checkPermission(stub, "admin") {
 			fmt.Printf("Forbidden")
 			return shim.Error(fmt.Sprintf("Forbidden"))
 		}
-		
+
 		key := "permissionRequest"
 		userCert, err := stub.GetState(key)
 		if err != nil {
 			return shim.Error(fmt.Sprintf("get permission request operation failed. Error accessing state: %s", err))
 		}
-		
+
 		key = string(userCert[:])
 		value := []byte("['read']")
 
 		if err := stub.PutState(key, value); err != nil {
 			fmt.Printf("Error putting state %s", err)
 			return shim.Error(fmt.Sprintf("put operation failed. Error updating state: %s", err))
-		}		
-		
-		if err := stub.SetEvent(key, []byte("ReadPermission")); err != nil {
+		}
+
+		message := new(Message)
+		message.Payload = "ReadPermission"
+
+		messageBytes, err := proto.Marshal(message)
+
+		if err != nil {
+			return shim.Error(fmt.Sprintf("Failed to create protobuf: %s", err))
+		}
+
+		if err := stub.SetEvent(key, messageBytes); err != nil {
 			return shim.Error(fmt.Sprintf("put operation failed. Error emiting state update event with compositeKey: %s", err))
 		}
-		
+
 		key = "lastGrantedUser"
-		
+
 		if err := stub.PutState(key, userCert); err != nil {
 			fmt.Printf("Error putting state %s", err)
 			return shim.Error(fmt.Sprintf("put operation failed. Error updating state: %s", err))
-		}	
-		
+		}
+
 		key = "permissionRequest"
 		err = stub.DelState(key)
 		if err != nil {

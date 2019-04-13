@@ -1,13 +1,14 @@
 group 'com.luxoft'
 version rootProject.version
 
+
 apply plugin: 'java'
 apply plugin: 'application'
 apply plugin: 'com.github.johnrengelman.shadow'
 apply plugin: 'maven-publish'
 
 sourceCompatibility = 1.8
-mainClassName = "com.luxoft.fabric.config.Configurator"
+mainClassName = "com.luxoft.fabric.configurator.Configurator"
 
 repositories {
     mavenLocal()
@@ -16,12 +17,10 @@ repositories {
 
 buildscript {
     repositories {
-        maven {
-            url "https://plugins.gradle.org/m2/"
-        }
+        maven { url "https://plugins.gradle.org/m2/" }
     }
     dependencies {
-        classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.4'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.4'
     }
 }
 
@@ -44,7 +43,7 @@ shadowJar {
 publishing {
     publications {
         maven(MavenPublication) {
-            groupId = mavenLocalGroupId            
+            groupId = mavenLocalGroupId
 
             from components.java
         }

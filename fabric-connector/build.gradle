@@ -1,8 +1,12 @@
 group 'com.luxoft'
 version rootProject.version
 
+ext.grpcVersion = '1.17.1'
+
 apply plugin: 'java'
+apply plugin: 'com.google.protobuf'
 apply plugin: 'maven-publish'
+
 
 sourceCompatibility = 1.8
 
@@ -11,15 +15,18 @@ repositories {
     mavenCentral()
 }
 
-//configurations {
-//    compile {
-//        exclude module: 'grpc-netty'
-//        exclude module: 'grpc-protobuf'
-//        exclude module: 'grpc-stub'
-//        exclude group: 'io.grpc', module: 'grpc-netty'
-//        exclude group: 'io.netty', module: 'netty-codec-http2'
-//    }
-//}
+
+buildscript {
+    repositories {
+        maven {
+            mavenCentral()
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath 'com.google.protobuf:protobuf-gradle-plugin:0.8.0'
+    }
+}
 
 dependencies {
     [ null, 'sources', 'javadoc' ].collect {
@@ -37,6 +44,8 @@ dependencies {
 
     testCompile project(':fabric-configurator')
     testCompile group: 'junit', name: 'junit', version: '4.12'
+    testCompile 'com.google.protobuf:protobuf-java:3.0.0'
+
 }
 
 publishing {
@@ -47,4 +56,69 @@ publishing {
             from components.java
         }
     }
+}
+
+sourceSets {
+    test {
+        proto {
+            srcDir 'src/test/proto'
+        }
+        java {
+            srcDirs += "${protobuf.generatedFilesBaseDir}/test/java"
+        }
+    }    
+}
+
+protobuf {
+    protoc {artifact = 'com.google.protobuf:protoc:3.0.2'}
+    plugins {
+        grpc { artifact = "io.grpc:protoc-gen-grpc-java:${grpcVersion}" }
+    }
+    generateProtoTasks {
+        all()*.plugins {
+            grpc {
+                // To generate deprecated interfaces and static bindService method,
+                // turn the enable_deprecated option to true below:
+                option 'enable_deprecated=false'
+            }
+        }
+        // generate descriptors:
+        all().each { task ->
+            task.generateDescriptorSet = true
+            task.descriptorSetOptions.includeImports = true
+            task.builtins {
+                go { }
+            }
+        }
+
+        //
+        // protobuf tasks initialized too late, so we cannot refer them from the main
+        // script. `generateProtoTasks` is to be the right place to configure
+        // protobuf's tasks.
+        //
+        // Next, Google says:
+        // "DO NOT assume the names of the tasks, as they may change."
+        // however this could be replaced by "ofSourceSet('test')" which is java only.
+        // Assume refering task by name is safe enough, and it name changes, we would get
+        // some error from Gradle here
+        //
+        generateTestProto.finalizedBy copyProtoToChainCodeDirectory
+    }
+}
+
+apply plugin: 'idea'
+
+idea {
+
+    module {
+        // Not using generatedSourceDirs because of
+        // https://discuss.gradle.org/t/support-for-intellij-2016/15294/8
+        sourceDirs += file("${protobuf.generatedFilesBaseDir}/main/java")
+        sourceDirs += file("${protobuf.generatedFilesBaseDir}/main/grpc")
+    }
+}
+
+task copyProtoToChainCodeDirectory(type: Copy) {
+    from "${protobuf.generatedFilesBaseDir}/test/go"
+    into "$projectDir/../files/chaincode/src/map"
 }
