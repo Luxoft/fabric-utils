@@ -336,9 +336,7 @@ public class NetworkManager {
     protected static Channel getChannel(final FabricConfig fabricConfig, String channelName) throws Exception {
 
         FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(fabricConfig).build());
-
-
-        return fabricConfig.getChannel(fabricConnector.getHfClient(), channelName, null);
+        return fabricConnector.getChannel(channelName);
     }
 
     public static byte[] getChannelConfig(final FabricConfig fabricConfig, String channelName) throws Exception {
