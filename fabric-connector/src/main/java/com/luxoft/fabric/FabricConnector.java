@@ -26,6 +26,7 @@ public class FabricConnector {
 
 
     private final ConfigAdapter configAdapter;
+    private final CryptoSuite cryptoSuite;
     private HFClient hfClient;
     private int defaultMaxReties = 3;
 
@@ -36,9 +37,19 @@ public class FabricConnector {
         return hfClient;
     }
 
+    public static HFClient createHFClientWithoutCryptoSuite() throws CryptoException, InvalidArgumentException {
+        HFClient hfClient = HFClient.createNewInstance();
+        return hfClient;
+    }
+
 
     private void initConnector() throws Exception {
-        hfClient = createHFClient();
+        if (cryptoSuite != null) {
+            hfClient = createHFClientWithoutCryptoSuite();
+            hfClient.setCryptoSuite(cryptoSuite);
+        } else {
+            hfClient = createHFClient();
+        }
 
         initUserContext();
 
@@ -258,6 +269,13 @@ public class FabricConnector {
 
     public FabricConnector(ConfigAdapter configAdapter) throws Exception {
         this.configAdapter = configAdapter;
+        this.cryptoSuite = null;
+        initConnector();
+    }
+
+    public FabricConnector(ConfigAdapter configAdapter, CryptoSuite customCryptoSuite) throws Exception {
+        this.configAdapter = configAdapter;
+        this.cryptoSuite = customCryptoSuite;
         initConnector();
     }
 }
