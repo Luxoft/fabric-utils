@@ -1,41 +1,33 @@
 package com.luxoft.fabric.integration;
 
-import com.luxoft.fabric.FabricConfig;
-import com.luxoft.fabric.configurator.NetworkManager;
 import org.apache.commons.io.IOUtils;
 import org.junit.AfterClass;
 import org.junit.Assert;
-import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.nio.charset.Charset;
 
+
 public class BaseIntegrationTest {
 
-    static FabricConfig fabricConfig;
-    FabricConfig fabricConfigServiceDiscovery = FabricConfig.getConfigFromFile("../files/fabric-service-discovery.yaml");
-    static final String NETWORK_CONFIG_FILE = FabricConnectorIntegrationTest.class.getClassLoader().getResource("network-config.yaml").getFile();
-    static final String NETWORK_CONFIG__SERVICE_DISCOVERY_FILE = FabricConnectorIntegrationTest.class.getClassLoader().getResource("network-config-service-discovery.yaml").getFile();
 
     private static final Logger logger = LoggerFactory.getLogger(BaseIntegrationTest.class);
 
-    @BeforeClass
-    public static void setUp() throws Exception {
+
+    static void startNetwork() {
         logger.info("Starting preparation");
         int exitCode = execInDirectory("./fabric.sh restart", "../files/artifacts/");
 
         logger.info("Waiting some time to give network the time to initialize");
-        Thread.sleep(5000);
+        try {
+            Thread.sleep(5000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException("Could not sleep well", e);
+        }
         logger.info("Restarted network");
         Assert.assertEquals(0, exitCode);
-
-        fabricConfig = FabricConfig.getConfigFromFile("../files/fabric.yaml");
-
-        // Configuring Fabric network
-        NetworkManager.configNetwork(fabricConfig);
-        logger.info("Finished preparation");
     }
 
     @AfterClass

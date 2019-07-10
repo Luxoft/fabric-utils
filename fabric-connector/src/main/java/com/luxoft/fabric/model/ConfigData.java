@@ -1,5 +1,6 @@
 package com.luxoft.fabric.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.luxoft.fabric.model.jackson.ConfigModule;
@@ -221,6 +222,10 @@ public class ConfigData {
     public static class Peer {
         public final String url;
         public final String name;
+
+
+        @JsonProperty("external")
+        public Boolean isExternal;
         public final FileReference pemFile;
 
         @JsonDeserialize(as = LinkedHashMap.class)
@@ -228,13 +233,14 @@ public class ConfigData {
 
         // Jackson specific constructor
         private Peer() {
-            this(null, null, null, null);
+            this(null, null, null, null, null);
         }
 
-        public Peer(String url, String name, FileReference pemFile, Map<String, String> properties) {
+        public Peer(String url, String name, FileReference pemFile, Boolean isExternal, Map<String, String> properties) {
             this.url = url;
             this.name = name;
             this.pemFile = pemFile;
+            this.isExternal = false; //default value
             this.properties = buildMap(properties);
         }
 

@@ -1,0 +1,16 @@
+---
+- StaticCollectionConfig:
+    name: topSecret
+    SignaturePolicyEnvelope:
+      identities:
+        - org1member:
+            role:
+              name: member
+              mspId: Org1MSP
+      policy:
+        1-of:
+          - signed-by: org1member
+    requiredPeerCount: 1
+    maximumPeerCount: 1
+    blockToLive: 0
+    memberOnlyRead: true

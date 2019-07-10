@@ -20,7 +20,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
-public class EventTrackerIntegrationTest extends BaseIntegrationTest {
+public class EventTrackerIntegrationTest extends OneOrgBaseIntegrationTest {
 
     private static final Logger logger = LoggerFactory.getLogger(EventTrackerIntegrationTest.class);
 
@@ -41,7 +41,7 @@ public class EventTrackerIntegrationTest extends BaseIntegrationTest {
     public void testEventTrackerWithFabricConfig() throws Exception {
 
         FabricConnector fabricConnector = new FabricConnector(
-                ConfigAdapter.getBuilder(fabricConfig)
+                ConfigAdapter.getBuilder(fabricConfigOrg1)
                         .withEventTracker(eventTracker)
                         .build());
 

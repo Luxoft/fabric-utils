@@ -22,6 +22,7 @@ package com.luxoft.fabric;
 import com.fasterxml.jackson.databind.*;
 import com.luxoft.fabric.events.EventTracker;
 import com.luxoft.fabric.model.ConfigData;
+import com.luxoft.fabric.model.ExtendedPeer;
 import com.luxoft.fabric.model.FileReference;
 import com.luxoft.fabric.model.jackson.ConfigModule;
 import com.luxoft.fabric.utils.ConfigGenerator;
@@ -259,7 +260,7 @@ public class FabricConfig {
      * @throws InvalidArgumentException throws by SDK in case of exception
      * @see HFClient#newPeer(String, String, Properties)
      */
-    public Peer getNewPeer(HFClient hfClient, String key) throws InvalidArgumentException {
+    public ExtendedPeer getNewPeer(HFClient hfClient, String key) throws InvalidArgumentException {
         ConfigData.Peer peerParameters = requireNonNull(getPeerDetails(key));
 
         String peerUrl = getOrThrow(peerParameters.url, String.format("peer[%s].url", key));
@@ -270,7 +271,9 @@ public class FabricConfig {
 
         logger.info("Creating Peer with props: {}", properties);
 
-        return hfClient.newPeer(peerName, peerUrl, properties);
+        Peer peer = hfClient.newPeer(peerName, peerUrl, properties);
+
+        return new ExtendedPeer(peer, peerParameters.isExternal);
     }
 
     /**
@@ -324,7 +327,7 @@ public class FabricConfig {
         hfClient.setUserContext(fabricUser);
 
         final List<Orderer> ordererList = getOrdererList(hfClient, channelName, channelParameters);
-        final List<Peer> peerList = getPeerList(hfClient, channelParameters);
+        final List<ExtendedPeer> peerList = getPeerList(hfClient, channelParameters);
         final List<EventHub> eventhubList = getEventHubList(hfClient, channelParameters);
 
         Channel channel = hfClient.newChannel(channelName);
@@ -349,8 +352,8 @@ public class FabricConfig {
             channel.addOrderer(orderer);
         }
 
-        for (Peer peer : peerList) {
-            channel.addPeer(peer, getPeerOptionsWithRoles(channelName, peer.getName(), commonPeerOptions));
+        for (ExtendedPeer extendedPeer : peerList) {
+            channel.addPeer(extendedPeer.getPeer(), getPeerOptionsWithRoles(channelName, extendedPeer.getPeer().getName(), commonPeerOptions));
         }
 
         for (EventHub eventhub : eventhubList) {
@@ -418,17 +421,18 @@ public class FabricConfig {
         return eventhubList;
     }
 
-    public List<Peer> getPeerList(HFClient hfClient, ConfigData.Channel channelParameters) throws InvalidArgumentException {
+    public List<ExtendedPeer> getPeerList(HFClient hfClient, ConfigData.Channel channelParameters) throws InvalidArgumentException {
         Map<String, ConfigData.ChannelPeer> peers = channelParameters.peers;
         if (peers == null || peers.isEmpty())
             throw new RuntimeException("Peers list can`t be empty");
-        List<Peer> peerList = new ArrayList<>();
+        List<ExtendedPeer> peerList = new ArrayList<>();
         for (String peerKey : peers.keySet()) {
-            Peer peer = getNewPeer(hfClient, peerKey);
+            ExtendedPeer peer = getNewPeer(hfClient, peerKey);
             peerList.add(peer);
         }
         return peerList;
     }
+
 
     public List<Orderer> getOrdererList(HFClient hfClient, String channelName, ConfigData.Channel channelParameters) throws InvalidArgumentException {
         Set<String> orderers = channelParameters.orderers;
@@ -555,6 +559,7 @@ public class FabricConfig {
         }
 
         checkProposalResponse("instantiate chaincode", instantiateProposalResponses);
+
         return channel.sendTransaction(instantiateProposalResponses);
     }
 

@@ -1,0 +1,93 @@
+admins:
+  - admin:
+      name: admin
+      cert: artifacts/crypto-config/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp/signcerts/Admin@org2.example.com-cert.pem
+      privateKey: artifacts/crypto-config/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp/keystore/*_sk
+      mspID: Org2MSP
+
+peers:
+  - peer0.org2.example.com:
+      url: grpcs://localhost:8051
+      pemFile: artifacts/crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/msp/tlscacerts/tlsca.org2.example.com-cert.pem
+      properties:
+        sslProvider: openSSL
+        negotiationType: TLS
+        hostnameOverride: peer0.org2.example.com
+  - peer0.org1.example.com:
+      url: grpcs://localhost:7051
+      pemFile: artifacts/crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp/tlscacerts/tlsca.org1.example.com-cert.pem
+      external: true
+      properties:
+        sslProvider: openSSL
+        negotiationType: TLS
+        hostnameOverride: peer0.org1.example.com
+  - peer1.org1.example.com:
+      url: grpcs://localhost:7056
+      pemFile: artifacts/crypto-config/peerOrganizations/org1.example.com/peers/peer1.org1.example.com/msp/tlscacerts/tlsca.org1.example.com-cert.pem
+      external: true
+      properties:
+        sslProvider: openSSL
+        negotiationType: TLS
+        hostnameOverride: peer1.org1.example.com
+
+orderers:
+  - orderer:
+      url: grpcs://localhost:7050
+      pemFile: artifacts/crypto-config/ordererOrganizations/example.com/tlsca/tlsca.example.com-cert.pem
+      properties:
+        sslProvider: openSSL
+        negotiationType: TLS
+        hostnameOverride: orderer.example.com
+        ordererWaitTimeMilliSecs: 10000
+
+chaincodes:
+  - superchaincode:
+      id: mychcode
+      sourceLocation: map
+      sourceLocationPrefix: chaincode
+      version: v1
+      type: GO_LANG
+      endorsementPolicy: chaincodeendorsementpolicy.yaml
+      collectionPolicy: private_data_config.yaml
+      initArguments:
+        - blabla
+        - blabla
+
+channels:
+  - mychannel:
+      admin: admin
+      orderers:
+        - orderer
+      peers:
+        - peer0.org2.example.com:
+            roles:
+              serviceDiscovery: false
+        - peer0.org1.example.com:
+            roles:
+              serviceDiscovery: false
+        - peer1.org1.example.com:
+            roles:
+              serviceDiscovery: false
+      txFile: artifacts/channel/mychannel.tx
+      chaincodes:
+        - superchaincode
+
+#cas:
+#    - ca.org1.example.com:
+#        url: https://localhost:7054
+#        pemFile: artifacts/crypto-config/peerOrganizations/org1.example.com/ca/ca.org1.example.com-cert.pem
+#        adminLogin: admin
+#        adminSecret: adminpw
+#        mspID: Org1MSP
+#        properties:
+#            allowAllHostNames: true
+#
+#users:
+#    destFilesPath: users/
+#    privateKeyFileName: pk.pem
+#    certFileName: cert.pem
+#    caKey: ca.org1.example.com
+#    userAffiliation: org1
+#    list:
+#        - user1
+#        - user2

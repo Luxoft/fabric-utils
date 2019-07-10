@@ -26,7 +26,7 @@ compile group: 'com.github.Luxoft.fabric-utils', name: 'fabric-connector', versi
 <dependency>
     <groupId>com.github.Luxoft</groupId>
     <artifactId>fabric-connector</artifactId>
-    <version>1.4.3</version>
+    <version>1.4.4</version>
 </dependency>
 ```
 

@@ -269,6 +269,7 @@ public class ConfigBuilder {
         private String url;
         private String name;
         private FileReference pemFile;
+        private Boolean isExternal;
         private Map<String, String> properties;
 
         public Peer withUrl(String url) {
@@ -278,6 +279,11 @@ public class ConfigBuilder {
 
         public Peer withName(String name) {
             this.name = name;
+            return this;
+        }
+
+        public Peer withIsExternal(Boolean isExternal) {
+            this.isExternal = isExternal;
             return this;
         }
 
@@ -292,7 +298,7 @@ public class ConfigBuilder {
         }
 
         public ConfigData.Peer build() {
-            return new ConfigData.Peer(url, name, pemFile, properties);
+            return new ConfigData.Peer(url, name, pemFile, isExternal, properties);
         }
     }
 

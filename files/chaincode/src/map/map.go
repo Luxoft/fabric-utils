@@ -80,8 +80,11 @@ func checkPermission(stub shim.ChaincodeStubInterface, permission string) bool {
 // remove - takes one argument, a key, and removes if from the state
 func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 
+	collection := "topSecret"
+
 	fmt.Printf("Invoking\n")
 	function, args := stub.GetFunctionAndParameters()
+	fmt.Printf("Invoking chaincode with command %s\n", function)
 	switch function {
 	case "put":
 		if !checkPermission(stub, "write") {
@@ -135,6 +138,45 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 
 		return shim.Success(nil)
 
+	case "putPrivate":
+		if !checkPermission(stub, "write") {
+			fmt.Printf("Forbidden")
+			return shim.Error(fmt.Sprintf("Forbidden"))
+		}
+
+		if len(args) < 2 {
+			return shim.Error("putPrivate operation must include two arguments, a key and value")
+		}
+		key := args[0]
+		value := args[1]
+
+		// Check current value
+		currentValue, err := stub.GetPrivateData(collection, key)
+		if err != nil {
+			fmt.Printf("Error putting state %s", err)
+			return shim.Error(fmt.Sprintf("put operation failed. Error updating state: %s", err))
+		}
+		fmt.Printf("Current value len: %d", len(currentValue))
+
+		if err := stub.PutPrivateData(collection, key, []byte(value)); err != nil {
+			fmt.Printf("Error putting state %s", err)
+			return shim.Error(fmt.Sprintf("put operation failed. Error updating state: %s", err))
+		}
+
+		indexName := "compositeKeyTest"
+		compositeKeyTestIndex, err := stub.CreateCompositeKey(indexName, []string{key})
+		if err != nil {
+			return shim.Error(err.Error())
+		}
+
+		valueByte := []byte{0x00}
+		if err := stub.PutPrivateData(collection, compositeKeyTestIndex, valueByte); err != nil {
+			fmt.Printf("Error putting state with compositeKey %s", err)
+			return shim.Error(fmt.Sprintf("put operation failed. Error updating state with compositeKey: %s", err))
+		}
+
+		return shim.Success(nil)
+
 	case "remove":
 		if !checkPermission(stub, "write") {
 			fmt.Printf("Forbidden")
@@ -164,6 +206,23 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 		key := args[0]
 
 		value, err := stub.GetState(key)
+		if err != nil {
+			return shim.Error(fmt.Sprintf("get operation failed. Error accessing state: %s", err))
+		}
+		return shim.Success(value)
+
+	case "getPrivate":
+		if !checkPermission(stub, "read") {
+			fmt.Printf("Forbidden")
+			return shim.Error(fmt.Sprintf("Forbidden"))
+		}
+
+		if len(args) < 1 {
+			return shim.Error("get operation must include one argument, a key")
+		}
+		key := args[0]
+
+		value, err := stub.GetPrivateData(collection, key)
 		if err != nil {
 			return shim.Error(fmt.Sprintf("get operation failed. Error accessing state: %s", err))
 		}

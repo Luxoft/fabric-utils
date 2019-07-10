@@ -15,7 +15,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Comparator;
 
-public class UserEnrollAndRegisterServiceIntegrationTest extends BaseIntegrationTest {
+public class UserEnrollAndRegisterServiceIntegrationTest extends OneOrgBaseIntegrationTest {
 
     private static final String CA_KEY = "ca.org1.example.com";
     private static final String USER_AFFILATION = "org1";
@@ -40,7 +40,7 @@ public class UserEnrollAndRegisterServiceIntegrationTest extends BaseIntegration
     @Test
     public void enrollAndRegisterUsingFabricConfigTest() throws Exception {
 
-        UserEnrollAndRegisterService enroller = UserEnrollAndRegisterService.getInstance(fabricConfig);
+        UserEnrollAndRegisterService enroller = UserEnrollAndRegisterService.getInstance(fabricConfigOrg1);
 
         User adminUser = enroller.enrollUser(CA_KEY, ADMIN, ADMIN_PASSWORD);
 
@@ -89,13 +89,13 @@ public class UserEnrollAndRegisterServiceIntegrationTest extends BaseIntegration
     public void registerTwoUsersUsingFabricConfigTest() throws Exception {
 
 
-        UserEnrollAndRegisterService enroller = UserEnrollAndRegisterService.getInstance(fabricConfig);
+        UserEnrollAndRegisterService enroller = UserEnrollAndRegisterService.getInstance(fabricConfigOrg1);
 
         String userSecret1 = enroller.registerUser(CA_KEY, "testUser7", USER_AFFILATION);
 
         Assert.assertNotNull(userSecret1);
 
-        UserEnrollAndRegisterService enroller2 = UserEnrollAndRegisterService.getInstance(fabricConfig);
+        UserEnrollAndRegisterService enroller2 = UserEnrollAndRegisterService.getInstance(fabricConfigOrg1);
 
         String userSecret2 = enroller2.registerUser(CA_KEY, "testUser8", USER_AFFILATION);
 

@@ -5,6 +5,7 @@ import com.luxoft.fabric.FabricConfig;
 import com.luxoft.fabric.FabricConnector;
 import com.luxoft.fabric.config.ConfigAdapter;
 import com.luxoft.fabric.model.ConfigData;
+import com.luxoft.fabric.model.ExtendedPeer;
 import com.luxoft.fabric.utils.MiscUtils;
 import org.hyperledger.fabric.protos.common.Common;
 import org.hyperledger.fabric.protos.common.Configtx;
@@ -12,13 +13,16 @@ import org.hyperledger.fabric.protos.peer.Query;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
+import org.hyperledger.fabric.sdk.exception.TransactionException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.concurrent.Callable;
+import java.util.stream.Collectors;
 
 import static com.luxoft.fabric.FabricConfig.getOrDefault;
 import static com.luxoft.fabric.FabricConfig.getOrThrow;
@@ -34,18 +38,16 @@ public class NetworkManager {
     static final int peerRetryDelaySec = 10;
     static final int peerRetryCount = 5;
 
-    public static void configNetwork(final FabricConfig fabricConfig) {
-        configNetwork(fabricConfig, false);
-    }
+    private static final Logger logger = LoggerFactory.getLogger(NetworkManager.class);
 
-    public boolean configNetwork(final FabricConfig fabricConfig, boolean skipUnauth, boolean waitChaincodes, int waitChaincodesTimeout) throws Exception {
-        configNetwork(fabricConfig, skipUnauth);
+    public static boolean configNetwork(final FabricConfig fabricConfig, boolean waitChaincodes, int waitChaincodesTimeout) throws Exception {
+        configNetwork(fabricConfig);
         if (waitChaincodes)
-            return waitChaincodes(FabricConnector.createHFClient(), fabricConfig, Collections.emptySet(), waitChaincodesTimeout, skipUnauth);
+            return waitChaincodes(FabricConnector.createHFClient(), fabricConfig, Collections.emptySet(), waitChaincodesTimeout);
         return true;
     }
 
-    public static void configNetwork(final FabricConfig fabricConfig, boolean skipUnauth) {
+    public static void configNetwork(final FabricConfig fabricConfig) {
 
         Map<String, ConfigData.Channel> channels = fabricConfig.getChannels();
         if (channels.isEmpty())
@@ -62,43 +64,41 @@ public class NetworkManager {
                 hfClient.setUserContext(fabricUser);
 
                 final List<Orderer> ordererList = fabricConfig.getOrdererList(hfClient, channelName, channelParameters);
-                final List<Peer> peerList = fabricConfig.getPeerList(hfClient, channelParameters);
+                final List<ExtendedPeer> peerList = fabricConfig.getPeerList(hfClient, channelParameters);
                 final List<EventHub> eventhubList = fabricConfig.getEventHubList(hfClient, channelParameters);
 
+
                 //Looking for channels on peers, to find has already joined
-                Set<Peer> peersWithChannel = new HashSet<>();
-                List<Peer> ownPeers = new LinkedList<>(peerList);
-                boolean channelExists = false;
-                for (Peer peer : peerList) {
-                    try {
-                        Set<String> joinedChannels = hfClient.queryChannels(peer);
+                Set<ExtendedPeer> peersWithChannel = new HashSet<>();
+                List<Peer> ownPeers = peerList.stream().filter(p -> !p.isExternal()).map(p -> p.getPeer()).collect(Collectors.toList());
+                boolean channelExistsOnPeers = false;
+                for (ExtendedPeer extendedPeer : peerList) {
+                    if (!extendedPeer.isExternal()) {
+                        Set<String> joinedChannels = hfClient.queryChannels(extendedPeer.getPeer());
                         if (joinedChannels.stream().anyMatch(installedChannelName -> installedChannelName.equalsIgnoreCase(channelName))) {
-                            channelExists = true;
-                            peersWithChannel.add(peer);
+                            channelExistsOnPeers = true;
+                            peersWithChannel.add(extendedPeer);
                         }
-                    } catch (ProposalException ex) {
-                        if (skipUnauth && ex.getLocalizedMessage().contains("description=access denied")) {
-                            System.err.println("Access denied exception happened while querying channels from peer " + peer.getName() + ", this is OK with external peers");
-                            peersWithChannel.add(peer);
-                            ownPeers.remove(peer);
-                            continue;
-                        }
-                        throw ex;
+                    } else {
+                        //in case of external peer we assume that it is in the channel. Seems not the very best logic...
+                        //todo: think what can be done about it.
+                        peersWithChannel.add(extendedPeer);
                     }
                 }
 
                 boolean newChannel = false;
                 Channel channelObj;
                 String txFile = fabricConfig.getFileName(channelParameters.txFile);
-                if (!channelExists && txFile != null) {
+
+                if (!channelExistsOnPeers && txFile != null) {
                     try {
                         ChannelConfiguration channelConfiguration = new ChannelConfiguration(new File(txFile));
                         byte[] channelConfigurationSignature = hfClient.getChannelConfigurationSignature(channelConfiguration, hfClient.getUserContext());
                         channelObj = hfClient.newChannel(channelName, ordererList.get(0), channelConfiguration, channelConfigurationSignature);
                         newChannel = true;
-                    } catch (Exception ex) {
-                        System.err.println("Exception happened while creating channel, this might not be a problem");
-                        ex.printStackTrace();
+                    } catch (TransactionException ex) {
+
+                        logger.warn("This is OK if the channel already exists in orderer", ex);
                         //recreating orderer object as it may be consumed by try channel and will be destroyed on it`s GC
                         Orderer newOrderer = fabricConfig.getNewOrderer(hfClient, ordererList.get(0).getName());
                         ordererList.set(0, newOrderer);
@@ -112,25 +112,23 @@ public class NetworkManager {
                 for (int i = newChannel ? 1 : 0; i < ordererList.size(); i++) {
                     channel.addOrderer(ordererList.get(i));
                 }
-                for (Peer peer : peerList) {
-                    if (peersWithChannel.contains(peer))
-                        channel.addPeer(peer);
+                for (ExtendedPeer extendedPeer : peerList) {
+                    if (peersWithChannel.contains(extendedPeer))
+                        channel.addPeer(extendedPeer.getPeer());
                     else
-                        runWithRetries(peerRetryCount, peerRetryDelaySec, () -> channel.joinPeer(peer));
+                        runWithRetries(peerRetryCount, peerRetryDelaySec, () -> channel.joinPeer(extendedPeer.getPeer()));
                 }
 
                 for (EventHub eventhub : eventhubList) {
                     channel.addEventHub(eventhub);
                 }
                 channel.initialize();
-                Set<Query.ChaincodeInfo> chaincodeInfoList = new HashSet<>();
-                for (Peer peer : ownPeers) {
-                    Callable action = () -> chaincodeInfoList.addAll(channel.queryInstantiatedChaincodes(peer));
-                    if (peersWithChannel.contains(peer))
-                        action.call();
-                    else
-                        runWithRetries(peerRetryCount, peerRetryDelaySec, action);
+                Set<Query.ChaincodeInfo> instantiatedChaincodesInfoSet = new HashSet<>();
+                for (ExtendedPeer extendedPeer : peersWithChannel) {
+                    instantiatedChaincodesInfoSet.addAll(channel.queryInstantiatedChaincodes(extendedPeer.getPeer()));
                 }
+
+                logger.info("Found instantiated chaincodes: {}", instantiatedChaincodesInfoSet.size());
 
                 final List<ConfigData.ChannelChaincode> chaincodes = getOrDefault(channelParameters.chaincodes, Collections.emptyList());
                 for (ConfigData.ChannelChaincode channelChaincode : chaincodes) {
@@ -139,20 +137,19 @@ public class NetworkManager {
                     try {
                         final JsonNode channelSpecificConfig = channelChaincode.collectionPolicy;
 
-                    ChaincodeID chaincodeID = fabricConfig.getChaincodeID(chaincodeKey);
+                        ChaincodeID chaincodeID = fabricConfig.getChaincodeID(chaincodeKey);
 
-                    installChaincodes(hfClient, fabricConfig, ownPeers, chaincodeKey);
-                    if (chaincodeInfoList.stream().anyMatch(chaincodeInfo -> MiscUtils.equals(chaincodeID, chaincodeInfo))) {
-                        System.out.println("Chaincode(" + chaincodeKey + ") was already instantiated, skipping");
-                        continue;
-                    }
-                    try {
-                        fabricConfig.instantiateChaincode(hfClient, channel, chaincodeKey, channelSpecificConfig).get();
-                    } catch (Exception e) {
-                        e.printStackTrace();
+                        installChaincodes(hfClient, fabricConfig, ownPeers, chaincodeKey);
+                        if (instantiatedChaincodesInfoSet.stream().anyMatch(chaincodeInfo -> MiscUtils.equals(chaincodeID, chaincodeInfo))) {
+                            logger.info("Chaincode {} was already instantiated, skipping", chaincodeKey);
+                            continue;
                         }
+
+                        fabricConfig.instantiateChaincode(hfClient, channel, chaincodeKey, channelSpecificConfig).get();
+
                     } catch (Exception e) {
-                        throw new RuntimeException(String.format("Unable to process chaincode '%d'", chaincodeKey), e);
+                        logger.error("Exception during chaincode instantiation", e);
+                        throw new RuntimeException(String.format("Unable to process chaincode '%s'", chaincodeKey), e);
                     }
                 }
             } catch (Exception e) {
@@ -161,7 +158,7 @@ public class NetworkManager {
         }
     }
 
-    public boolean waitChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names, long seconds, boolean skipUnauth) throws Exception {
+    public static boolean waitChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names, long seconds) throws Exception {
 
         class WaitContext {
             private final Set<String> chaincodes = new HashSet<>();
@@ -183,7 +180,8 @@ public class NetworkManager {
             final Channel channel = hfc.getChannel(channelName);
             final WaitContext wc = waitContext.computeIfAbsent(channelName, (k) -> new WaitContext());
 
-            wc.peers.addAll(channel.getPeers());
+            final Set<String> notOurOrgPeerNames = fabricConfig.getPeerList(hfc, channelValue).stream().filter(p -> p.isExternal()).map(p -> p.getPeer().getName()).collect(Collectors.toSet());
+            wc.peers.addAll(channel.getPeers().stream().filter(p -> !notOurOrgPeerNames.contains(p.getName())).collect(Collectors.toSet()));
 
             //TODO: The behaviour is questionable.
             // In case we pass some non-existing chaincode, wait will be finished succesfully.
@@ -215,18 +213,6 @@ public class NetworkManager {
                     final Channel channel = hfc.getChannel(channelName);
                     for (Iterator<Peer> peerIterator = wc.peers.iterator(); peerIterator.hasNext(); ) {
                         final Peer peer = peerIterator.next();
-                        if (skipUnauth) {
-                            try {
-                                hfc.queryChannels(peer);
-                            } catch (ProposalException ex) {
-                                if (ex.getLocalizedMessage().contains("description=access denied")) {
-                                    System.out.println("Access denied exception happened while querying channels from peer " + peer.getName() + ", this is OK with external peers");
-                                    peerIterator.remove();
-                                    continue;
-                                }
-                                throw ex;
-                            }
-                        }
                         final List<Query.ChaincodeInfo> chaincodeInfoList = channel.queryInstantiatedChaincodes(peer);
                         final Set<String> s = new HashSet(wc.chaincodes);
                         chaincodeInfoList.forEach((elem) -> s.remove(elem.getName()));
@@ -267,12 +253,12 @@ public class NetworkManager {
                 return false;
             }
             Thread.sleep(1000);
-            skipUnauth = false;
         }
         return true;
     }
 
-    public static void deployChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {
+    public static void deployChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws
+            Exception {
 
         Map<String, ConfigData.Channel> channels = fabricConfig.getChannels();
         for (Map.Entry<String, ConfigData.Channel> channelEntry : channels.entrySet()) {
@@ -303,7 +289,8 @@ public class NetworkManager {
         }
     }
 
-    public static void upgradeChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws Exception {
+    public static void upgradeChaincodes(HFClient hfc, final FabricConfig fabricConfig, Set<String> names) throws
+            Exception {
 
         Map<String, ConfigData.Channel> channels = fabricConfig.getChannels();
         for (Map.Entry<String, ConfigData.Channel> channelEntry : channels.entrySet()) {
@@ -343,12 +330,14 @@ public class NetworkManager {
         return getChannel(fabricConfig, channelName).getChannelConfigurationBytes();
     }
 
-    public static String getChannelConfigJson(final FabricConfig fabricConfig, String channelName) throws Exception {
+    public static String getChannelConfigJson(final FabricConfig fabricConfig, String channelName) throws
+            Exception {
         byte[] bytes = getChannelConfig(fabricConfig, channelName);
         return configTxLator.protoToJson("common.Config", bytes);
     }
 
-    public static byte[] signChannelUpdateConfig(HFClient hfc, final FabricConfig fabricConfig, byte[] channelConfig, String userKey) throws Exception {
+    public static byte[] signChannelUpdateConfig(HFClient hfc, final FabricConfig fabricConfig,
+                                                 byte[] channelConfig, String userKey) throws Exception {
         UpdateChannelConfiguration channelConfigurationUpdate = new UpdateChannelConfiguration(channelConfig);
         User signingUser = fabricConfig.getAdmin(userKey);
         if (hfc.getUserContext() == null)
@@ -356,13 +345,15 @@ public class NetworkManager {
         return hfc.getUpdateChannelConfigurationSignature(channelConfigurationUpdate, signingUser);
     }
 
-    public static void setChannelConfig(final FabricConfig fabricConfig, String channelName, byte[] channelConfigurationUpdateBytes, byte[]... signatures) throws Exception {
+    public static void setChannelConfig(final FabricConfig fabricConfig, String channelName,
+                                        byte[] channelConfigurationUpdateBytes, byte[]... signatures) throws Exception {
         Channel channel = getChannel(fabricConfig, channelName);
         UpdateChannelConfiguration channelConfigurationUpdate = new UpdateChannelConfiguration(channelConfigurationUpdateBytes);
         channel.updateChannelConfiguration(channelConfigurationUpdate, signatures);
     }
 
-    protected static byte[] generateAddCompanyToChannelUpdate(Channel channel, String companyName, byte[] companyConfigGroupBytes) throws Exception {
+    protected static byte[] generateAddCompanyToChannelUpdate(Channel channel, String companyName,
+                                                              byte[] companyConfigGroupBytes) throws Exception {
         byte[] channelConfigBytes = channel.getChannelConfigurationBytes();
         Configtx.Config.Builder targetChannelConfig = Configtx.Config.parseFrom(channelConfigBytes).toBuilder();
         Configtx.ConfigGroup companyConfigGroup = Configtx.ConfigGroup.parseFrom(companyConfigGroupBytes);
@@ -378,14 +369,16 @@ public class NetworkManager {
         return configTxLator.queryUpdateConfigurationBytes(channel.getName(), channelConfigBytes, targetChannelConfig.build().toByteArray());
     }
 
-    public static byte[] updateChannel(final FabricConfig fabricConfig, String channelName, String targetChannelConfigJson) throws Exception {
+    public static byte[] updateChannel(final FabricConfig fabricConfig, String channelName, String
+            targetChannelConfigJson) throws Exception {
         Channel channel = getChannel(fabricConfig, channelName);
         byte[] channelConfigBytes = channel.getChannelConfigurationBytes();
         byte[] targetChannelConfigBytes = configTxLator.jsonToProtoBytes("common.Config", targetChannelConfigJson);
         return configTxLator.queryUpdateConfigurationBytes(channel.getName(), channelConfigBytes, targetChannelConfigBytes);
     }
 
-    public static byte[] addCompanyToChannel(final FabricConfig fabricConfig, String channelName, String companyName, String companyConfigGroupJson) throws Exception {
+    public static byte[] addCompanyToChannel(final FabricConfig fabricConfig, String channelName, String
+            companyName, String companyConfigGroupJson) throws Exception {
         Channel channel = getChannel(fabricConfig, channelName);
         byte[] companyConfigGroupBytes = configTxLator.jsonToProtoBytes("common.ConfigGroup", companyConfigGroupJson);
         return generateAddCompanyToChannelUpdate(channel, companyName, companyConfigGroupBytes);
@@ -395,7 +388,8 @@ public class NetworkManager {
         return Configtx.ConfigUpdate.parseFrom(Configtx.ConfigUpdateEnvelope.parseFrom(Common.Payload.parseFrom(Common.Envelope.parseFrom(anchorProto).getPayload()).getData()).getConfigUpdate()).toByteArray();
     }
 
-    public static byte[] setAppSingleAdmin(final FabricConfig fabricConfig, String channelName, String companyName) throws Exception {
+    public static byte[] setAppSingleAdmin(final FabricConfig fabricConfig, String channelName, String companyName) throws
+            Exception {
         Channel channel = getChannel(fabricConfig, channelName);
         byte[] channelConfigBytes = channel.getChannelConfigurationBytes();
         Configtx.Config.Builder targetChannelConfig = Configtx.Config.parseFrom(channelConfigBytes).toBuilder();
@@ -417,7 +411,8 @@ public class NetworkManager {
         return configTxLator.queryUpdateConfigurationBytes(channel.getName(), channelConfigBytes, targetChannelConfig.build().toByteArray());
     }
 
-    private static void installChaincodes(HFClient hfc, FabricConfig fabricConfig, List<Peer> peers, String chaincodeKey) throws InvalidArgumentException, ProposalException {
+    private static void installChaincodes(HFClient hfc, FabricConfig fabricConfig, List<Peer> peers, String
+            chaincodeKey) throws InvalidArgumentException, ProposalException {
         ChaincodeID chaincodeID = fabricConfig.getChaincodeID(chaincodeKey);
         for (Peer peer : peers) {
             List<Query.ChaincodeInfo> peerInstallerChaincodes = hfc.queryInstalledChaincodes(peer);
