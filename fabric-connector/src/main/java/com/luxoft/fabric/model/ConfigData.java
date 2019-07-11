@@ -1,6 +1,5 @@
 package com.luxoft.fabric.model;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.luxoft.fabric.model.jackson.ConfigModule;
@@ -66,17 +65,20 @@ public class ConfigData {
         public final FileReference cert;
         public final FileReference privateKey;
         public final String mspID;
+        public final Set<String> managedOrgs;
 
         // Jackson specific constructor
         private Admin() {
-            this(null, null, null, null);
+            this(null, null, null, null, null);
         }
 
-        public Admin(String name, FileReference cert, FileReference privateKey, String mspID) {
+        public Admin(String name, FileReference cert, FileReference privateKey, String mspID, Set<String> managedOrgs) {
             this.name = name;
             this.cert = cert;
             this.privateKey = privateKey;
             this.mspID = mspID;
+            this.managedOrgs = managedOrgs != null ? managedOrgs : new HashSet<>();
+            ;
         }
     }
 
@@ -222,10 +224,7 @@ public class ConfigData {
     public static class Peer {
         public final String url;
         public final String name;
-
-
-        @JsonProperty("external")
-        public Boolean isExternal;
+        public Set<String> managedByOrgs;
         public final FileReference pemFile;
 
         @JsonDeserialize(as = LinkedHashMap.class)
@@ -236,11 +235,11 @@ public class ConfigData {
             this(null, null, null, null, null);
         }
 
-        public Peer(String url, String name, FileReference pemFile, Boolean isExternal, Map<String, String> properties) {
+        public Peer(String url, String name, FileReference pemFile, Set<String> managedByOrgs, Map<String, String> properties) {
             this.url = url;
             this.name = name;
             this.pemFile = pemFile;
-            this.isExternal = false; //default value
+            this.managedByOrgs = managedByOrgs != null ? managedByOrgs : new HashSet<>();
             this.properties = buildMap(properties);
         }
 

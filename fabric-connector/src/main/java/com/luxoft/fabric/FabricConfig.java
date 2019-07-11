@@ -22,6 +22,7 @@ package com.luxoft.fabric;
 import com.fasterxml.jackson.databind.*;
 import com.luxoft.fabric.events.EventTracker;
 import com.luxoft.fabric.model.ConfigData;
+import com.luxoft.fabric.model.ConfigDataValidator;
 import com.luxoft.fabric.model.ExtendedPeer;
 import com.luxoft.fabric.model.FileReference;
 import com.luxoft.fabric.model.jackson.ConfigModule;
@@ -86,6 +87,10 @@ public class FabricConfig {
             final JsonNode root = yamlConfig.getRoot();
             ConfigModule.configure(mapper);
             config = mapper.treeToValue(root, ConfigData.Root.class);
+
+            ConfigDataValidator validator = new ConfigDataValidator(config);
+            validator.validate();
+
         }
     }
 
@@ -260,8 +265,9 @@ public class FabricConfig {
      * @throws InvalidArgumentException throws by SDK in case of exception
      * @see HFClient#newPeer(String, String, Properties)
      */
-    public ExtendedPeer getNewPeer(HFClient hfClient, String key) throws InvalidArgumentException {
+    public ExtendedPeer getNewPeer(HFClient hfClient, String key) throws Exception {
         ConfigData.Peer peerParameters = requireNonNull(getPeerDetails(key));
+        ConfigData.Admin adminParameters = requireNonNull(getAdminDetailsByName(hfClient.getUserContext().getName()));
 
         String peerUrl = getOrThrow(peerParameters.url, String.format("peer[%s].url", key));
         String peerName = getOrDefault(peerParameters.name, key);
@@ -273,7 +279,17 @@ public class FabricConfig {
 
         Peer peer = hfClient.newPeer(peerName, peerUrl, properties);
 
-        return new ExtendedPeer(peer, peerParameters.isExternal);
+        return new ExtendedPeer(peer, Collections.disjoint(adminParameters.managedOrgs, peerParameters.managedByOrgs));
+    }
+
+    private ConfigData.Admin getAdminDetailsByName(String name) throws Exception {
+
+        for (String adminKey : getAdminsKeys()) {
+            if (name.equals(getAdminDetails(adminKey).name))
+                return getAdminDetails(adminKey);
+
+        }
+        throw new RuntimeException(String.format("Admin with name %s not found. Check admin section of fabric.yaml", name));
     }
 
     /**
@@ -421,7 +437,7 @@ public class FabricConfig {
         return eventhubList;
     }
 
-    public List<ExtendedPeer> getPeerList(HFClient hfClient, ConfigData.Channel channelParameters) throws InvalidArgumentException {
+    public List<ExtendedPeer> getPeerList(HFClient hfClient, ConfigData.Channel channelParameters) throws Exception {
         Map<String, ConfigData.ChannelPeer> peers = channelParameters.peers;
         if (peers == null || peers.isEmpty())
             throw new RuntimeException("Peers list can`t be empty");

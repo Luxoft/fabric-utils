@@ -69,7 +69,7 @@ public class NetworkManager {
 
 
                 //Looking for channels on peers, to find has already joined
-                Set<ExtendedPeer> peersWithChannel = new HashSet<>();
+                Set<ExtendedPeer> assumedPeersWithChannel = new HashSet<>();
                 List<Peer> ownPeers = peerList.stream().filter(p -> !p.isExternal()).map(p -> p.getPeer()).collect(Collectors.toList());
                 boolean channelExistsOnPeers = false;
                 for (ExtendedPeer extendedPeer : peerList) {
@@ -77,12 +77,11 @@ public class NetworkManager {
                         Set<String> joinedChannels = hfClient.queryChannels(extendedPeer.getPeer());
                         if (joinedChannels.stream().anyMatch(installedChannelName -> installedChannelName.equalsIgnoreCase(channelName))) {
                             channelExistsOnPeers = true;
-                            peersWithChannel.add(extendedPeer);
+                            assumedPeersWithChannel.add(extendedPeer);
                         }
                     } else {
-                        //in case of external peer we assume that it is in the channel. Seems not the very best logic...
-                        //todo: think what can be done about it.
-                        peersWithChannel.add(extendedPeer);
+                        // Here we assume that external peer belong to the channel. In case it is not - the ap will fail later.
+                        assumedPeersWithChannel.add(extendedPeer);
                     }
                 }
 
@@ -113,7 +112,7 @@ public class NetworkManager {
                     channel.addOrderer(ordererList.get(i));
                 }
                 for (ExtendedPeer extendedPeer : peerList) {
-                    if (peersWithChannel.contains(extendedPeer))
+                    if (assumedPeersWithChannel.contains(extendedPeer))
                         channel.addPeer(extendedPeer.getPeer());
                     else
                         runWithRetries(peerRetryCount, peerRetryDelaySec, () -> channel.joinPeer(extendedPeer.getPeer()));
@@ -124,8 +123,17 @@ public class NetworkManager {
                 }
                 channel.initialize();
                 Set<Query.ChaincodeInfo> instantiatedChaincodesInfoSet = new HashSet<>();
-                for (ExtendedPeer extendedPeer : peersWithChannel) {
-                    instantiatedChaincodesInfoSet.addAll(channel.queryInstantiatedChaincodes(extendedPeer.getPeer()));
+                for (ExtendedPeer extendedPeer : assumedPeersWithChannel) {
+                    try {
+                        List<Query.ChaincodeInfo> chaincodeInfos = channel.queryInstantiatedChaincodes(extendedPeer.getPeer());
+                        instantiatedChaincodesInfoSet.addAll(chaincodeInfos);
+                    } catch (ProposalException e) {
+                        if (extendedPeer.isExternal()) {
+                            throw new RuntimeException("Assumption was wrong. External peer does not belong to the channel. Remove it from channel configuration section or join it to the channel", e);
+                        } else {
+                            throw new RuntimeException("Inknown issue happened with our peer", e);
+                        }
+                    }
                 }
 
                 logger.info("Found instantiated chaincodes: {}", instantiatedChaincodesInfoSet.size());

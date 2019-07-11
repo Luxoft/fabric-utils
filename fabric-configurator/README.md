@@ -18,7 +18,7 @@ Path of congitxlator can be overridden with parameter --configtxlator (ex. --con
 Types of operations supported by the configurator:
 
 - **config** - create channels and deploy chaincodes using fabric.yaml
-    - `%jar% --type=config --config=network/fabric-devnet.yaml --skipunauth`
+    - `%jar% --type=config --config=network/fabric-devnet.yaml`
         - *config* - fabric.yaml configuration
         - *wait-chaincode* (optional) - flag to wait till chaincodes are fully initialized
 - **wait-chaincode** - wait till chaincodes are fully initialized

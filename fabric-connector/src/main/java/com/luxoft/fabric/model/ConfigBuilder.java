@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 public class ConfigBuilder {
 
@@ -68,6 +69,7 @@ public class ConfigBuilder {
         private FileReference cert;
         private FileReference privateKey;
         private String mspID;
+        private Set<String> managedOrgs;
 
         public Admin withName(String name) {
             this.name = name;
@@ -89,8 +91,13 @@ public class ConfigBuilder {
             return this;
         }
 
+        public Admin withManagedOrgs(Set<String> managedOrgs) {
+            this.managedOrgs = managedOrgs;
+            return this;
+        }
+
         public ConfigData.Admin build() {
-            return new ConfigData.Admin(name, cert, privateKey, mspID);
+            return new ConfigData.Admin(name, cert, privateKey, mspID, managedOrgs);
         }
     }
 
@@ -269,7 +276,7 @@ public class ConfigBuilder {
         private String url;
         private String name;
         private FileReference pemFile;
-        private Boolean isExternal;
+        private Set<String> managedByOrgs;
         private Map<String, String> properties;
 
         public Peer withUrl(String url) {
@@ -282,8 +289,8 @@ public class ConfigBuilder {
             return this;
         }
 
-        public Peer withIsExternal(Boolean isExternal) {
-            this.isExternal = isExternal;
+        public Peer withManagedByOrgs(Set<String> managedByOrgs) {
+            this.managedByOrgs = managedByOrgs;
             return this;
         }
 
@@ -298,7 +305,7 @@ public class ConfigBuilder {
         }
 
         public ConfigData.Peer build() {
-            return new ConfigData.Peer(url, name, pemFile, isExternal, properties);
+            return new ConfigData.Peer(url, name, pemFile, managedByOrgs, properties);
         }
     }
 

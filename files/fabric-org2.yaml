@@ -4,11 +4,15 @@ admins:
       cert: artifacts/crypto-config/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp/signcerts/Admin@org2.example.com-cert.pem
       privateKey: artifacts/crypto-config/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp/keystore/*_sk
       mspID: Org2MSP
+      managedOrgs:
+        - org2.example.com
 
 peers:
   - peer0.org2.example.com:
       url: grpcs://localhost:8051
       pemFile: artifacts/crypto-config/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/msp/tlscacerts/tlsca.org2.example.com-cert.pem
+      managedByOrgs:
+        - org2.example.com
       properties:
         sslProvider: openSSL
         negotiationType: TLS
@@ -16,7 +20,8 @@ peers:
   - peer0.org1.example.com:
       url: grpcs://localhost:7051
       pemFile: artifacts/crypto-config/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/msp/tlscacerts/tlsca.org1.example.com-cert.pem
-      external: true
+      managedByOrgs:
+        - org1.example.com
       properties:
         sslProvider: openSSL
         negotiationType: TLS
@@ -24,7 +29,8 @@ peers:
   - peer1.org1.example.com:
       url: grpcs://localhost:7056
       pemFile: artifacts/crypto-config/peerOrganizations/org1.example.com/peers/peer1.org1.example.com/msp/tlscacerts/tlsca.org1.example.com-cert.pem
-      external: true
+      managedByOrgs:
+        - org1.example.com
       properties:
         sslProvider: openSSL
         negotiationType: TLS
