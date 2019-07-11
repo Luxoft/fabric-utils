@@ -3,6 +3,7 @@ package com.luxoft.fabric.integration;
 import com.luxoft.fabric.FabricConnector;
 import com.luxoft.fabric.config.ConfigAdapter;
 import org.hyperledger.fabric.sdk.BlockEvent;
+import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -10,6 +11,8 @@ import org.junit.rules.ExpectedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -65,7 +68,7 @@ public class PrivateDataIntegrationTest extends TwoOrgsBaseIntegrationTest {
     }
 
 
-    private void putToBc(FabricConnector fabricConnector, byte[] key, byte[] value) throws ExecutionException, InterruptedException {
+    private void putToBc(FabricConnector fabricConnector, byte[] key, byte[] value) throws ExecutionException, InterruptedException, InvalidArgumentException {
 
         CompletableFuture<BlockEvent.TransactionEvent> putEventFuture = fabricConnector.invoke(
                 "put", "mychcode", "mychannel", key, value);
@@ -73,16 +76,21 @@ public class PrivateDataIntegrationTest extends TwoOrgsBaseIntegrationTest {
 
     }
 
-    private void putToBcPrivate(FabricConnector fabricConnector, byte[] key, byte[] value) throws ExecutionException, InterruptedException {
+    private void putToBcPrivate(FabricConnector fabricConnector, byte[] key, byte[] value) throws ExecutionException, InterruptedException, InvalidArgumentException {
+
+        Map<String, byte[]> transientMap = new HashMap<>();
+
+        transientMap.put("key", key);
+        transientMap.put("value", value);
 
         CompletableFuture<BlockEvent.TransactionEvent> putEventFuture = fabricConnector.invoke(
-                "putPrivate", "mychcode", "mychannel", key, value);
+                "putPrivate", "mychcode", "mychannel", transientMap);
         Assert.assertNotNull(putEventFuture.get());
 
     }
 
 
-    private void getFromBc(FabricConnector fabricConnector, byte[] key, byte[] expectedValue) throws ExecutionException, InterruptedException {
+    private void getFromBc(FabricConnector fabricConnector, byte[] key, byte[] expectedValue) throws ExecutionException, InterruptedException, InvalidArgumentException {
 
         //Replace this by querying using another peer form the same organization
         CompletableFuture<byte[]> queryFuture = fabricConnector.query(
@@ -91,11 +99,14 @@ public class PrivateDataIntegrationTest extends TwoOrgsBaseIntegrationTest {
 
     }
 
-    private void getFromBcPrivate(FabricConnector fabricConnector, byte[] key, byte[] expectedValue) throws ExecutionException, InterruptedException {
+    private void getFromBcPrivate(FabricConnector fabricConnector, byte[] key, byte[] expectedValue) throws ExecutionException, InterruptedException, InvalidArgumentException {
 
-        //Replace this by querying using another peer form the same organization
+        Map<String, byte[]> transientMap = new HashMap<>();
+
+        transientMap.put("key", key);
+
         CompletableFuture<byte[]> queryFuture = fabricConnector.query(
-                "getPrivate", "mychcode", "mychannel", key);
+                "getPrivate", "mychcode", "mychannel", transientMap);
         Assert.assertArrayEquals(expectedValue, queryFuture.get());
 
     }

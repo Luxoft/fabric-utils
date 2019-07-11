@@ -53,8 +53,17 @@ func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
 	creatorString := url.PathEscape(string(creator[:]))
 	fmt.Printf("Init creator: %s\n", creatorString)
 
-	stub.PutState(creatorString, []byte("['read','write','admin']"))
+	err = stub.PutState(creatorString, []byte("['read','write','admin']"))
+	if err != nil {
+		return shim.Error(fmt.Sprintf("Failed to put creator string. Error: %s", err))
+	}
+
 	state, err := stub.GetState(creatorString)
+
+	if err != nil {
+		return shim.Error(fmt.Sprintf("Failed to get creator state. Error: %s", err))
+	}
+
 	fmt.Printf("Check state: %s", string(state[:]))
 	return shim.Success(nil)
 }
@@ -144,11 +153,22 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 			return shim.Error(fmt.Sprintf("Forbidden"))
 		}
 
-		if len(args) < 2 {
-			return shim.Error("putPrivate operation must include two arguments, a key and value")
+		transientMap, err := stub.GetTransient()
+		if err != nil {
+			fmt.Printf("Error getting transient map:  %s", err)
+			return shim.Error(fmt.Sprintf("put operation failed. Error getting transient map: %s", err))
 		}
-		key := args[0]
-		value := args[1]
+		keyBytes, found := transientMap["key"]
+		if !found {
+			return shim.Error("putPrivate operation must have key")
+		}
+
+		key := string(keyBytes)
+
+		value, found := transientMap["value"]
+		if !found {
+			return shim.Error("putPrivate operation must have value")
+		}
 
 		// Check current value
 		currentValue, err := stub.GetPrivateData(collection, key)
@@ -158,7 +178,7 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 		}
 		fmt.Printf("Current value len: %d", len(currentValue))
 
-		if err := stub.PutPrivateData(collection, key, []byte(value)); err != nil {
+		if err := stub.PutPrivateData(collection, key, value); err != nil {
 			fmt.Printf("Error putting state %s", err)
 			return shim.Error(fmt.Sprintf("put operation failed. Error updating state: %s", err))
 		}
@@ -217,10 +237,17 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 			return shim.Error(fmt.Sprintf("Forbidden"))
 		}
 
-		if len(args) < 1 {
-			return shim.Error("get operation must include one argument, a key")
+		transientMap, err := stub.GetTransient()
+		if err != nil {
+			fmt.Printf("Error getting transient map:  %s", err)
+			return shim.Error(fmt.Sprintf("put operation failed. Error getting transient map: %s", err))
 		}
-		key := args[0]
+		keyBytes, found := transientMap["key"]
+		if !found {
+			return shim.Error("putPrivate operation must have key")
+		}
+
+		key := string(keyBytes)
 
 		value, err := stub.GetPrivateData(collection, key)
 		if err != nil {

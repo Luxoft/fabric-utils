@@ -91,12 +91,16 @@ public class FabricConnector {
     }
 
 
-    public TransactionProposalRequest buildProposalRequest(String function, String chaincode, byte[][] message) {
+    public TransactionProposalRequest buildProposalRequest(String function, String chaincode, byte[][] message, Map<String, byte[]> transientMap) throws InvalidArgumentException {
 
         final TransactionProposalRequest transactionProposalRequest = hfClient.newTransactionProposalRequest();
         transactionProposalRequest.setChaincodeID(ChaincodeID.newBuilder().setName(chaincode).build());
         transactionProposalRequest.setFcn(function);
         transactionProposalRequest.setArgBytes(message);
+
+        if (transientMap != null) {
+            transactionProposalRequest.setTransientMap(transientMap);
+        }
 
         return transactionProposalRequest;
     }
@@ -164,12 +168,16 @@ public class FabricConnector {
         });
     }
 
-    public QueryByChaincodeRequest buildQueryRequest(String function, String chaincode, byte[][] message) {
+    public QueryByChaincodeRequest buildQueryRequest(String function, String chaincode, byte[][] message, Map<String, byte[]> transientMap) throws InvalidArgumentException {
 
         final QueryByChaincodeRequest queryByChaincodeRequest = hfClient.newQueryProposalRequest();
         queryByChaincodeRequest.setChaincodeID(ChaincodeID.newBuilder().setName(chaincode).build());
         queryByChaincodeRequest.setFcn(function);
         queryByChaincodeRequest.setArgBytes(message);
+
+        if (transientMap != null) {
+            queryByChaincodeRequest.setTransientMap(transientMap);
+        }
 
         return queryByChaincodeRequest;
     }
@@ -205,28 +213,53 @@ public class FabricConnector {
     }
 
     @SuppressWarnings("unused")
-    public CompletableFuture<byte[]> query(String function, String chaincode, byte[]... message) {
+    public CompletableFuture<byte[]> query(String function, String chaincode, byte[]... message) throws InvalidArgumentException {
         return query(function, chaincode, configAdapter.getDefaultChannelName(), message);
     }
 
-    public CompletableFuture<byte[]> query(String function, String chaincode, String channelName, byte[]... message) {
-        return sendQueryRequest(buildQueryRequest(function, chaincode, message), channelName);
+    public CompletableFuture<byte[]> query(String function, String chaincode, String channelName, byte[]... message) throws InvalidArgumentException {
+        return sendQueryRequest(buildQueryRequest(function, chaincode, message, null), channelName);
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, byte[]... message) {
-        return invoke(function, chaincode, configAdapter.getDefaultChannelName(), defaultMaxReties, message);
+    @SuppressWarnings("unused")
+    public CompletableFuture<byte[]> query(String function, String chaincode, Map<String, byte[]> transientMap, byte[]... message) throws InvalidArgumentException {
+        return query(function, chaincode, configAdapter.getDefaultChannelName(), transientMap, message);
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, byte[]... message) {
-        return invoke(function, chaincode, channelName, defaultMaxReties, message);
+    public CompletableFuture<byte[]> query(String function, String chaincode, String channelName, Map<String, byte[]> transientMap, byte[]... message) throws InvalidArgumentException {
+        return sendQueryRequest(buildQueryRequest(function, chaincode, message, transientMap), channelName);
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, int maxRetries, byte[]... message) {
-        return invoke(function, chaincode, configAdapter.getDefaultChannelName(), maxRetries, message);
+    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, byte[]... message) throws InvalidArgumentException {
+        return invoke(function, chaincode, configAdapter.getDefaultChannelName(), defaultMaxReties, null, message);
     }
 
-    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, int maxRetries, byte[]... message) {
-        CompletableFuture<BlockEvent.TransactionEvent> f = sendTransaction(buildProposalRequest(function, chaincode, message), channelName);
+    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, byte[]... message) throws InvalidArgumentException {
+        return invoke(function, chaincode, channelName, defaultMaxReties, null, message);
+    }
+
+    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, int maxRetries, byte[]... message) throws InvalidArgumentException {
+        return invoke(function, chaincode, configAdapter.getDefaultChannelName(), maxRetries, null, message);
+    }
+
+    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, Map<String, byte[]> transientMap, byte[]... message) throws InvalidArgumentException {
+        return invoke(function, chaincode, configAdapter.getDefaultChannelName(), defaultMaxReties, transientMap, message);
+    }
+
+    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, Map<String, byte[]> transientMap, byte[]... message) throws InvalidArgumentException {
+        return invoke(function, chaincode, channelName, defaultMaxReties, transientMap, message);
+    }
+
+    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, int maxRetries, Map<String, byte[]> transientMap, byte[]... message) throws InvalidArgumentException {
+        return invoke(function, chaincode, configAdapter.getDefaultChannelName(), maxRetries, transientMap, message);
+    }
+
+    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, int maxRetries, byte[]... message) throws InvalidArgumentException {
+        return invoke(function, chaincode, channelName, maxRetries, null, message);
+    }
+
+    public CompletableFuture<BlockEvent.TransactionEvent> invoke(String function, String chaincode, String channelName, int maxRetries, Map<String, byte[]> transientMap, byte[]... message) throws InvalidArgumentException {
+        CompletableFuture<BlockEvent.TransactionEvent> f = sendTransaction(buildProposalRequest(function, chaincode, message, transientMap), channelName);
 
         // Here we handle retry 'maxRetries' times
         // Basically we just chain N(='maxRetries') dummy futures that push successful one further
@@ -242,7 +275,7 @@ public class FabricConnector {
                                     case MVCC_READ_CONFLICT_VALUE:
                                     case PHANTOM_READ_CONFLICT_VALUE:
                                         logger.warn("ReadSet-related error so we recreate transaction ", t);
-                                        return sendTransaction(buildProposalRequest(function, chaincode, message), channelName);
+                                        return sendTransaction(buildProposalRequest(function, chaincode, message, transientMap), channelName);
                                     default:
                                         // fail on other Tx errors, retries won't help here
                                         return failedFuture(t);

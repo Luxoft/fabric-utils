@@ -8,6 +8,7 @@ import com.luxoft.fabric.integration.proto.SimpleMessage;
 import org.hyperledger.fabric.sdk.BlockEvent;
 import org.hyperledger.fabric.sdk.ChaincodeEvent;
 import org.hyperledger.fabric.sdk.NetworkConfig;
+import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -72,7 +73,7 @@ public class EventTrackerIntegrationTest extends OneOrgBaseIntegrationTest {
     }
 
 
-    private void sendTransactionAndCheckEvents(FabricConnector fabricConnector) throws ExecutionException, InterruptedException, InvalidProtocolBufferException, TimeoutException {
+    private void sendTransactionAndCheckEvents(FabricConnector fabricConnector) throws ExecutionException, InterruptedException, InvalidProtocolBufferException, TimeoutException, InvalidArgumentException {
 
 
         CompletableFuture<String> eventStatus = new CompletableFuture<>();
