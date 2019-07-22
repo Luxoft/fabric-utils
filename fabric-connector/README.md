@@ -14,7 +14,7 @@ Below there will be example of each usage:
 repositories { 
     maven { url 'https://jitpack.io' }
 }
-compile group: 'com.github.Luxoft.fabric-utils', name: 'fabric-connector', version: 1.4.2
+compile group: 'com.github.Luxoft.fabric-utils', name: 'fabric-connector', version: 1.4.4
 ```
 #### Maven
 ```
