@@ -14,7 +14,7 @@ Below there will be example of each usage:
 repositories { 
     maven { url 'https://jitpack.io' }
 }
-compile group: 'com.github.Luxoft.fabric-utils', name: 'fabric-connector', version: 1.4.4
+compile group: 'com.github.Luxoft.fabric-utils', name: 'fabric-connector', version: 1.4.5
 ```
 #### Maven
 ```
@@ -26,7 +26,7 @@ compile group: 'com.github.Luxoft.fabric-utils', name: 'fabric-connector', versi
 <dependency>
     <groupId>com.github.Luxoft</groupId>
     <artifactId>fabric-connector</artifactId>
-    <version>1.4.4</version>
+    <version>1.4.5</version>
 </dependency>
 ```
 
