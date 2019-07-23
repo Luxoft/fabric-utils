@@ -44,6 +44,8 @@ public class PrivateDataIntegrationTest extends TwoOrgsBaseIntegrationTest {
         logger.info("Finished SanityCheck");
     }
 
+    //TODO: IMPORTANT SECURITY ISSUE: memberOnlyRead property does not work
+    // Test is passing only because of check in the chaincode before returning data
     @Test
     public void testNegativeCase() throws Exception {
         logger.info("Starting SanityCheck");
@@ -62,7 +64,7 @@ public class PrivateDataIntegrationTest extends TwoOrgsBaseIntegrationTest {
         exceptionRule.expect(ExecutionException.class);
         exceptionRule.expectMessage("Forbidden");
 
-        getFromBc(fabricConnectorOrg2, key, value);
+        getFromBcPrivate(fabricConnectorOrg2, key, value);
 
         logger.info("Finished SanityCheck");
     }
