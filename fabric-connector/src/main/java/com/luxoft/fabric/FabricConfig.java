@@ -22,6 +22,8 @@ package com.luxoft.fabric;
 import com.fasterxml.jackson.databind.*;
 import com.luxoft.fabric.events.EventTracker;
 import com.luxoft.fabric.model.ConfigData;
+import com.luxoft.fabric.model.ConfigDataValidator;
+import com.luxoft.fabric.model.ExtendedPeer;
 import com.luxoft.fabric.model.FileReference;
 import com.luxoft.fabric.model.jackson.ConfigModule;
 import com.luxoft.fabric.utils.ConfigGenerator;
@@ -85,6 +87,10 @@ public class FabricConfig {
             final JsonNode root = yamlConfig.getRoot();
             ConfigModule.configure(mapper);
             config = mapper.treeToValue(root, ConfigData.Root.class);
+
+            ConfigDataValidator validator = new ConfigDataValidator(config);
+            validator.validate();
+
         }
     }
 
@@ -259,8 +265,9 @@ public class FabricConfig {
      * @throws InvalidArgumentException throws by SDK in case of exception
      * @see HFClient#newPeer(String, String, Properties)
      */
-    public Peer getNewPeer(HFClient hfClient, String key) throws InvalidArgumentException {
+    public ExtendedPeer getNewPeer(HFClient hfClient, String key) throws Exception {
         ConfigData.Peer peerParameters = requireNonNull(getPeerDetails(key));
+        ConfigData.Admin adminParameters = requireNonNull(getAdminDetailsByName(hfClient.getUserContext().getName()));
 
         String peerUrl = getOrThrow(peerParameters.url, String.format("peer[%s].url", key));
         String peerName = getOrDefault(peerParameters.name, key);
@@ -270,7 +277,19 @@ public class FabricConfig {
 
         logger.info("Creating Peer with props: {}", properties);
 
-        return hfClient.newPeer(peerName, peerUrl, properties);
+        Peer peer = hfClient.newPeer(peerName, peerUrl, properties);
+
+        return new ExtendedPeer(peer, Collections.disjoint(adminParameters.managedOrgs, peerParameters.managedByOrgs));
+    }
+
+    private ConfigData.Admin getAdminDetailsByName(String name) throws Exception {
+
+        for (String adminKey : getAdminsKeys()) {
+            if (name.equals(getAdminDetails(adminKey).name))
+                return getAdminDetails(adminKey);
+
+        }
+        throw new RuntimeException(String.format("Admin with name %s not found. Check admin section of fabric.yaml", name));
     }
 
     /**
@@ -324,7 +343,7 @@ public class FabricConfig {
         hfClient.setUserContext(fabricUser);
 
         final List<Orderer> ordererList = getOrdererList(hfClient, channelName, channelParameters);
-        final List<Peer> peerList = getPeerList(hfClient, channelParameters);
+        final List<ExtendedPeer> peerList = getPeerList(hfClient, channelParameters);
         final List<EventHub> eventhubList = getEventHubList(hfClient, channelParameters);
 
         Channel channel = hfClient.newChannel(channelName);
@@ -349,8 +368,8 @@ public class FabricConfig {
             channel.addOrderer(orderer);
         }
 
-        for (Peer peer : peerList) {
-            channel.addPeer(peer, getPeerOptionsWithRoles(channelName, peer.getName(), commonPeerOptions));
+        for (ExtendedPeer extendedPeer : peerList) {
+            channel.addPeer(extendedPeer.getPeer(), getPeerOptionsWithRoles(channelName, extendedPeer.getPeer().getName(), commonPeerOptions));
         }
 
         for (EventHub eventhub : eventhubList) {
@@ -418,17 +437,18 @@ public class FabricConfig {
         return eventhubList;
     }
 
-    public List<Peer> getPeerList(HFClient hfClient, ConfigData.Channel channelParameters) throws InvalidArgumentException {
+    public List<ExtendedPeer> getPeerList(HFClient hfClient, ConfigData.Channel channelParameters) throws Exception {
         Map<String, ConfigData.ChannelPeer> peers = channelParameters.peers;
         if (peers == null || peers.isEmpty())
             throw new RuntimeException("Peers list can`t be empty");
-        List<Peer> peerList = new ArrayList<>();
+        List<ExtendedPeer> peerList = new ArrayList<>();
         for (String peerKey : peers.keySet()) {
-            Peer peer = getNewPeer(hfClient, peerKey);
+            ExtendedPeer peer = getNewPeer(hfClient, peerKey);
             peerList.add(peer);
         }
         return peerList;
     }
+
 
     public List<Orderer> getOrdererList(HFClient hfClient, String channelName, ConfigData.Channel channelParameters) throws InvalidArgumentException {
         Set<String> orderers = channelParameters.orderers;
@@ -493,7 +513,7 @@ public class FabricConfig {
         List<String> chaincodeInitArguments = getOrDefault(chaincodeParameters.initArguments, Collections.emptyList());
 
         InstantiateProposalRequest instantiateProposalRequest = hfClient.newInstantiationProposalRequest();
-        instantiateProposalRequest.setProposalWaitTime(120000);
+        instantiateProposalRequest.setProposalWaitTime(1200000);
         instantiateProposalRequest.setChaincodeID(chaincodeID);
         instantiateProposalRequest.setFcn("init");
         instantiateProposalRequest.setArgs(chaincodeInitArguments.toArray(new String[0]));
@@ -555,6 +575,7 @@ public class FabricConfig {
         }
 
         checkProposalResponse("instantiate chaincode", instantiateProposalResponses);
+
         return channel.sendTransaction(instantiateProposalResponses);
     }
 
@@ -574,7 +595,7 @@ public class FabricConfig {
         UpgradeProposalRequest upgradeProposalRequest = hfClient.newUpgradeProposalRequest();
         upgradeProposalRequest.setChaincodeID(chaincodeID);
         upgradeProposalRequest.setChaincodeVersion(chaincodeVersion);
-        upgradeProposalRequest.setProposalWaitTime(120000);
+        upgradeProposalRequest.setProposalWaitTime(1200000);
         upgradeProposalRequest.setArgs(chaincodeInitArguments.toArray(new String[0]));
         Map<String, byte[]> tm = new HashMap<>();
         tm.put("HyperLedgerFabric", "UpgradeProposalRequest:JavaSDK".getBytes(UTF_8));

@@ -18,11 +18,6 @@ To work with already configured channel you will need to provide following data
         - cert – path to user certificate pem file
         - privateKey – path to user private key pem file
         - mspID – id of organization(predefined in fabric network) that user belongs to
-- eventhubs – list of event hubs (deprecated, use peer event service)
-    - key-name – key value that can be used for referring eventhubs in this config file
-        - url – url for access
-        - pemFile – file location for x509 pem certificate for SSL
-        - properties – list of eventhub SDK properties
 - peers – list of peers
     - key-name – key value that can be used for referring peer in this config file
         - url – url for access
@@ -37,8 +32,7 @@ To work with already configured channel you will need to provide following data
     - key-name – key value that can be used for referring channel in application
         - admin – user that will be used for working with this channel
         - orderers – list of orderer key-names that serve this channel
-        - peers – list of peer key-names that serve this channel
-        - eventhubs (deprecated) – list of eventhub key-names that serve this channel
+        - peers – list of peer key-names that serve this channel        
 
 - cas – list of CAs
     - key-name – key value that can be used for referring CA in application

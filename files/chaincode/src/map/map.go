@@ -53,8 +53,17 @@ func (t *SimpleChaincode) Init(stub shim.ChaincodeStubInterface) pb.Response {
 	creatorString := url.PathEscape(string(creator[:]))
 	fmt.Printf("Init creator: %s\n", creatorString)
 
-	stub.PutState(creatorString, []byte("['read','write','admin']"))
+	err = stub.PutState(creatorString, []byte("['read','write','admin']"))
+	if err != nil {
+		return shim.Error(fmt.Sprintf("Failed to put creator string. Error: %s", err))
+	}
+
 	state, err := stub.GetState(creatorString)
+
+	if err != nil {
+		return shim.Error(fmt.Sprintf("Failed to get creator state. Error: %s", err))
+	}
+
 	fmt.Printf("Check state: %s", string(state[:]))
 	return shim.Success(nil)
 }
@@ -80,8 +89,11 @@ func checkPermission(stub shim.ChaincodeStubInterface, permission string) bool {
 // remove - takes one argument, a key, and removes if from the state
 func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 
+	collection := "topSecret"
+
 	fmt.Printf("Invoking\n")
 	function, args := stub.GetFunctionAndParameters()
+	fmt.Printf("Invoking chaincode with command %s\n", function)
 	switch function {
 	case "put":
 		if !checkPermission(stub, "write") {
@@ -135,6 +147,56 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 
 		return shim.Success(nil)
 
+	case "putPrivate":
+		if !checkPermission(stub, "write") {
+			fmt.Printf("Forbidden")
+			return shim.Error(fmt.Sprintf("Forbidden"))
+		}
+
+		transientMap, err := stub.GetTransient()
+		if err != nil {
+			fmt.Printf("Error getting transient map:  %s", err)
+			return shim.Error(fmt.Sprintf("put operation failed. Error getting transient map: %s", err))
+		}
+		keyBytes, found := transientMap["key"]
+		if !found {
+			return shim.Error("putPrivate operation must have key")
+		}
+
+		key := string(keyBytes)
+
+		value, found := transientMap["value"]
+		if !found {
+			return shim.Error("putPrivate operation must have value")
+		}
+
+		// Check current value
+		currentValue, err := stub.GetPrivateData(collection, key)
+		if err != nil {
+			fmt.Printf("Error putting state %s", err)
+			return shim.Error(fmt.Sprintf("put operation failed. Error updating state: %s", err))
+		}
+		fmt.Printf("Current value len: %d", len(currentValue))
+
+		if err := stub.PutPrivateData(collection, key, value); err != nil {
+			fmt.Printf("Error putting state %s", err)
+			return shim.Error(fmt.Sprintf("put operation failed. Error updating state: %s", err))
+		}
+
+		indexName := "compositeKeyTest"
+		compositeKeyTestIndex, err := stub.CreateCompositeKey(indexName, []string{key})
+		if err != nil {
+			return shim.Error(err.Error())
+		}
+
+		valueByte := []byte{0x00}
+		if err := stub.PutPrivateData(collection, compositeKeyTestIndex, valueByte); err != nil {
+			fmt.Printf("Error putting state with compositeKey %s", err)
+			return shim.Error(fmt.Sprintf("put operation failed. Error updating state with compositeKey: %s", err))
+		}
+
+		return shim.Success(nil)
+
 	case "remove":
 		if !checkPermission(stub, "write") {
 			fmt.Printf("Forbidden")
@@ -164,6 +226,30 @@ func (t *SimpleChaincode) Invoke(stub shim.ChaincodeStubInterface) pb.Response {
 		key := args[0]
 
 		value, err := stub.GetState(key)
+		if err != nil {
+			return shim.Error(fmt.Sprintf("get operation failed. Error accessing state: %s", err))
+		}
+		return shim.Success(value)
+
+	case "getPrivate":
+		if !checkPermission(stub, "read") {
+			fmt.Printf("Forbidden")
+			return shim.Error(fmt.Sprintf("Forbidden"))
+		}
+
+		transientMap, err := stub.GetTransient()
+		if err != nil {
+			fmt.Printf("Error getting transient map:  %s", err)
+			return shim.Error(fmt.Sprintf("put operation failed. Error getting transient map: %s", err))
+		}
+		keyBytes, found := transientMap["key"]
+		if !found {
+			return shim.Error("putPrivate operation must have key")
+		}
+
+		key := string(keyBytes)
+
+		value, err := stub.GetPrivateData(collection, key)
 		if err != nil {
 			return shim.Error(fmt.Sprintf("get operation failed. Error accessing state: %s", err))
 		}

@@ -13,7 +13,7 @@ import java.io.File;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
-public class ServiceDiscoveryIntegrationTest extends BaseIntegrationTest {
+public class ServiceDiscoveryIntegrationTest extends OneOrgBaseIntegrationTest {
 
     private static final Logger logger = LoggerFactory.getLogger(FabricConnectorIntegrationTest.class);
 

@@ -2,10 +2,8 @@ package com.luxoft.fabric.integration;
 
 import com.luxoft.fabric.FabricConnector;
 import com.luxoft.fabric.config.*;
-import com.luxoft.fabric.FabricConnector;
 import org.hyperledger.fabric.sdk.BlockEvent;
 import org.hyperledger.fabric.sdk.NetworkConfig;
-import org.hyperledger.fabric.sdk.User;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -24,7 +22,7 @@ import org.slf4j.LoggerFactory;
  *
  * Sets up environment using default configuration from "files/fabric.yaml"
  */
-public class FabricConnectorIntegrationTest extends BaseIntegrationTest {
+public class FabricConnectorIntegrationTest extends OneOrgBaseIntegrationTest {
 
     private static final Logger logger = LoggerFactory.getLogger(FabricConnectorIntegrationTest.class);
 
@@ -35,7 +33,7 @@ public class FabricConnectorIntegrationTest extends BaseIntegrationTest {
     public void testSanityCheck() throws Exception {
         logger.info("Starting SanityCheck");
 
-        FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(fabricConfig).build());
+        FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(fabricConfigOrg1).build());
 
         byte[] key = "someKey".getBytes();
         byte[] value = UUID.randomUUID().toString().getBytes();
@@ -73,7 +71,7 @@ public class FabricConnectorIntegrationTest extends BaseIntegrationTest {
     @Test
     public void testTxRace() throws Exception {
         logger.info("Starting testTxRace");
-        FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(fabricConfig).build());
+        FabricConnector fabricConnector = new FabricConnector(ConfigAdapter.getBuilder(fabricConfigOrg1).build());
 
         AtomicInteger success = new AtomicInteger();
 
